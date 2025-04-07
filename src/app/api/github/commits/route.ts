@@ -5,6 +5,34 @@ import { prisma } from '@/lib/prisma';
 import { Octokit } from '@octokit/rest';
 import { subDays } from 'date-fns';
 
+interface GitHubCommit {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      date: string;
+      name: string;
+      email: string;
+    };
+  };
+  html_url: string;
+}
+
+interface Commit {
+  id: string;
+  message: string;
+  date: string;
+  author: string;
+  url: string;
+}
+
+interface GitHubError {
+  status: number;
+  message: string;
+}
+
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     console.log('Iniciando busca de commits...');
@@ -85,7 +113,7 @@ export async function GET(request: Request) {
     const thirtyDaysAgo = subDays(new Date(), 30);
     console.log('Buscando commits desde:', thirtyDaysAgo.toISOString());
     
-    let allCommits: any[] = [];
+    let allCommits: Commit[] = [];
     
     for (const repoParam of repositories) {
       // Verifica se o repositório está no formato correto
@@ -109,21 +137,21 @@ export async function GET(request: Request) {
         console.log(`Encontrados ${commits.length} commits no repositório ${repoParam}`);
         
         // Formata os commits
-        const formattedCommits = commits.map((commit: any) => ({
+        const formattedCommits = commits.map((commit: GitHubCommit) => ({
           id: commit.sha,
           message: commit.commit.message,
-          date: commit.commit.author?.date || commit.commit.committer?.date,
-          repository: repoParam,
+          date: commit.commit.author.date,
+          author: commit.commit.author.name,
           url: commit.html_url,
         }));
         
         allCommits = [...allCommits, ...formattedCommits];
-      } catch (error: any) {
+      } catch (error) {
         console.error(`Erro ao buscar commits do repositório ${repoParam}:`, error);
         console.error('Detalhes do erro:', {
-          message: error.message,
-          status: error.status,
-          response: error.response?.data
+          message: (error as GitHubError).message,
+          status: (error as GitHubError).status,
+          response: (error as any).response?.data
         });
         
         // Continua para o próximo repositório
@@ -140,9 +168,10 @@ export async function GET(request: Request) {
     return NextResponse.json(allCommits);
   } catch (error) {
     console.error('Erro ao buscar commits:', error);
+    const githubError = error as GitHubError;
     return NextResponse.json(
-      { error: 'Erro ao buscar commits. Por favor, tente novamente.' },
-      { status: 500 }
+      { error: githubError.message || 'Erro ao buscar commits' },
+      { status: githubError.status || 500 }
     );
   }
 } 

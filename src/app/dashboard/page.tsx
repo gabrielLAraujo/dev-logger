@@ -50,38 +50,24 @@ export default function DashboardPage() {
 
   const fetchRepositories = async () => {
     try {
-      console.log('Buscando repositórios...');
-      console.log('Token de acesso:', session?.accessToken ? 'Presente' : 'Ausente');
-      
-      const response = await fetch('/api/github/repositories', {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-      
+      setLoading(true);
+      const response = await fetch('/api/github/repositories');
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Erro ao buscar repositórios:', errorData);
-        throw new Error(errorData.error || 'Falha ao buscar repositórios');
+        throw new Error('Falha ao buscar repositórios');
       }
-      
       const data = await response.json();
-      console.log(`Encontrados ${data.length} repositórios`);
       setRepositories(data);
-      
-      // Após buscar os repositórios, buscamos os commits
-      if (data.length > 0) {
-        fetchCommits(data[0]);
-      } else {
-        setLoading(false);
-      }
     } catch (error) {
       console.error('Erro ao buscar repositórios:', error);
-      setError('Não foi possível carregar os repositórios');
+      setError('Erro ao buscar repositórios');
+    } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRepositories();
+  }, [fetchRepositories]);
 
   const fetchCommits = async (repo: Repository) => {
     try {

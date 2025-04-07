@@ -17,7 +17,16 @@ declare module '@octokit/rest' {
     });
 
     repos: {
-      listCommits(params: {
+      listForAuthenticatedUser(options?: {
+        visibility?: 'all' | 'public' | 'private';
+        affiliation?: string;
+        type?: 'all' | 'owner' | 'public' | 'private' | 'member';
+        sort?: 'created' | 'updated' | 'pushed' | 'full_name';
+        direction?: 'asc' | 'desc';
+        per_page?: number;
+        page?: number;
+      }): Promise<OctokitResponse<Repository[]>>;
+      listCommits(options: {
         owner: string;
         repo: string;
         sha?: string;
@@ -28,35 +37,11 @@ declare module '@octokit/rest' {
         committer?: string;
         per_page?: number;
         page?: number;
-      }): Promise<{
-        data: Array<{
-          sha: string;
-          node_id: string;
-          commit: {
-            message: string;
-            author: {
-              name: string;
-              email: string;
-              date: string;
-            };
-            committer: {
-              name: string;
-              email: string;
-              date: string;
-            };
-          };
-          url: string;
-          html_url: string;
-          comments_url: string;
-          [key: string]: any;
-        }>;
-        status: number;
-        headers: {
-          [key: string]: string;
-        };
-      }>;
+      }): Promise<OctokitResponse<Commit[]>>;
       [key: string]: any;
     };
     [key: string]: any;
   }
+
+  export = Octokit;
 } 

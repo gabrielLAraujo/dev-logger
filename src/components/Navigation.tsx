@@ -2,17 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
-import { 
-  Home, 
-  Settings, 
+import { cn } from '@/lib/utils';
+import {
+  Home,
+  GitBranch,
+  FileText,
   LogOut,
+  User,
   Menu,
   X,
   FolderGit2,
   Download
 } from 'lucide-react';
 import { useState } from 'react';
+import { signOut, useSession } from 'next-auth/react';
 
 export default function Navigation() {
   const pathname = usePathname();

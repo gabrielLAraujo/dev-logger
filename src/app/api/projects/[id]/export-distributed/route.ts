@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { format, startOfMonth, endOfMonth, parseISO, eachDayOfInterval, differenceInDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Octokit } from '@octokit/rest';
 
@@ -17,6 +17,17 @@ interface Commit {
 
 interface CommitsByDay {
   [date: string]: Commit[];
+}
+
+interface GitHubCommit {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      date: string;
+    };
+  };
+  html_url: string;
 }
 
 export async function GET(
@@ -79,6 +90,13 @@ export async function GET(
     // Buscar commits para todos os repositórios do projeto
     let allCommits: Commit[] = [];
     
+    if (!session?.user?.id || !session?.user?.email) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+    }
+
+    const userId = session.user.id;
+    const userEmail = session.user.email;
+    
     for (const repoParam of project.repositories) {
       if (!repoParam.includes('/')) {
         console.log('Formato de repositório inválido:', repoParam);
@@ -93,20 +111,20 @@ export async function GET(
           repo,
           since: startDate.toISOString(),
           until: endDate.toISOString(),
-          author: session.user.email || undefined,
+          author: userEmail,
         });
         
-        const formattedCommits = commits.map((commit: any) => ({
+        const formattedCommits = commits.map((commit: GitHubCommit) => ({
           id: commit.sha,
           message: commit.commit.message,
-          date: commit.commit.author?.date || commit.commit.committer?.date,
+          date: commit.commit.author.date,
           repository: repoParam,
           url: commit.html_url,
-          userId: session?.user?.id || 'unknown',
-        }));
+          userId,
+        })) as Commit[];
         
         allCommits = [...allCommits, ...formattedCommits];
-      } catch (error: any) {
+      } catch (error) {
         console.error(`Erro ao buscar commits do repositório ${repoParam}:`, error);
         continue;
       }
