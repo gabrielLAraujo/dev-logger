@@ -41,6 +41,7 @@ export default function LoginPage() {
 
   const handleGitHubLogin = () => {
     setIsLoading(true);
+    setErrorMessage(null);
     signIn('github', { callbackUrl: '/dashboard' });
   };
   
