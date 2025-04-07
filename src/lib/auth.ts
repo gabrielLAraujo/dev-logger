@@ -96,7 +96,12 @@ export const authOptions: NextAuthOptions = {
       console.log('SignIn callback:', {
         user: JSON.stringify(user, null, 2),
         account: JSON.stringify(account, null, 2),
-        profile: JSON.stringify(profile, null, 2)
+        profile: JSON.stringify(profile, null, 2),
+        env: {
+          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+          GITHUB_ID: process.env.GITHUB_ID,
+          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL
+        }
       });
       return true;
     },
