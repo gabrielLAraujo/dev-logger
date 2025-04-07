@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Github } from 'lucide-react';
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -23,6 +24,7 @@ export default function LoginPage() {
 
   const handleGitHubLogin = async () => {
     try {
+      setIsLoading(true);
       console.log('Iniciando login com GitHub...');
       await signIn('github', { 
         callbackUrl: '/dashboard',
@@ -30,6 +32,7 @@ export default function LoginPage() {
       });
     } catch (error) {
       console.error('Erro ao fazer login:', error);
+      setIsLoading(false);
     }
   };
 
@@ -59,15 +62,28 @@ export default function LoginPage() {
             <p className="text-sm text-red-500">
               {error === 'OAuthAccountNotLinked' 
                 ? 'Esta conta do GitHub já está vinculada a outro usuário.'
+                : error === 'OAuthSignin'
+                ? 'Erro ao iniciar o processo de autenticação com o GitHub.'
+                : error === 'OAuthCallback'
+                ? 'Erro ao processar a resposta do GitHub.'
+                : error === 'OAuthCreateAccount'
+                ? 'Não foi possível criar uma conta com o GitHub.'
+                : error === 'EmailCreateAccount'
+                ? 'Não foi possível criar uma conta com o email fornecido.'
+                : error === 'Callback'
+                ? 'Erro ao processar a autenticação.'
+                : error === 'OAuthAccountNotLinked'
+                ? 'Esta conta do GitHub já está vinculada a outro usuário.'
                 : 'Ocorreu um erro ao fazer login. Tente novamente.'}
             </p>
           )}
           <Button
             onClick={handleGitHubLogin}
             className="w-full"
+            disabled={isLoading}
           >
             <Github className="mr-2 h-5 w-5" />
-            Entrar com GitHub
+            {isLoading ? 'Entrando...' : 'Entrar com GitHub'}
           </Button>
         </div>
       </Card>
