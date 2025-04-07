@@ -17,6 +17,9 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('Status da sessão:', status);
+    console.log('Dados da sessão:', session);
+    
     if (status === 'authenticated') {
       console.log('Usuário autenticado, redirecionando para o dashboard...', {
         session: JSON.stringify(session, null, 2)
@@ -50,9 +53,15 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
       setErrorMessage(null);
+      
       console.log('Iniciando login com GitHub...', {
         callbackUrl: '/dashboard',
-        redirect: true
+        redirect: true,
+        env: {
+          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+          GITHUB_ID: process.env.GITHUB_ID,
+          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL
+        }
       });
       
       const result = await signIn('github', { 
@@ -61,9 +70,15 @@ export default function LoginPage() {
       });
       
       console.log('Resultado do login:', result);
+      
+      if (!result) {
+        console.error('Resultado do login é undefined');
+        setErrorMessage('Erro ao iniciar o processo de login. Verifique as configurações do GitHub OAuth.');
+      }
     } catch (error) {
       console.error('Erro ao fazer login:', error);
       setErrorMessage('Ocorreu um erro ao fazer login. Tente novamente.');
+    } finally {
       setIsLoading(false);
     }
   };

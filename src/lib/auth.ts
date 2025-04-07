@@ -109,26 +109,6 @@ export const authOptions: NextAuthOptions = {
       
       if (session.user) {
         session.user.id = token.sub;
-        
-        // Se estamos usando JWT, o token contém o access_token
-        if (token.accessToken) {
-          session.accessToken = token.accessToken as string;
-        } else if (user) {
-          // Se estamos usando database, buscamos o access_token do banco
-          const account = await prisma.account.findFirst({
-            where: {
-              userId: user.id,
-              provider: 'github',
-            },
-            select: {
-              access_token: true,
-            },
-          });
-          
-          if (account?.access_token) {
-            session.accessToken = account.access_token;
-          }
-        }
       }
       return session;
     },
