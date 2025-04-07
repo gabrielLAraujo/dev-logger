@@ -36,12 +36,10 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           scope: "read:user user:email repo",
-          redirect_uri: process.env.NODE_ENV === 'production' 
-            ? 'https://dev-logger.vercel.app/api/auth/callback/github'
-            : 'http://localhost:3000/api/auth/callback/github',
         },
       },
       profile(profile) {
+        console.log('GitHub profile:', profile);
         if (!profile || !profile.id) {
           throw new Error('Perfil do GitHub inválido');
         }
@@ -135,5 +133,5 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Habilitando debug para ver mais informações sobre os erros
 }; 

@@ -14,6 +14,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -22,9 +23,31 @@ export default function LoginPage() {
     }
   }, [status]);
 
+  useEffect(() => {
+    if (error) {
+      console.error('Erro de autenticação:', error);
+      setErrorMessage(
+        error === 'OAuthAccountNotLinked' 
+          ? 'Esta conta do GitHub já está vinculada a outro usuário.'
+          : error === 'OAuthSignin'
+          ? 'Erro ao iniciar o processo de autenticação com o GitHub.'
+          : error === 'OAuthCallback'
+          ? 'Erro ao processar a resposta do GitHub. Verifique se as configurações do GitHub OAuth estão corretas.'
+          : error === 'OAuthCreateAccount'
+          ? 'Não foi possível criar uma conta com o GitHub.'
+          : error === 'EmailCreateAccount'
+          ? 'Não foi possível criar uma conta com o email fornecido.'
+          : error === 'Callback'
+          ? 'Erro ao processar a autenticação.'
+          : 'Ocorreu um erro ao fazer login. Tente novamente.'
+      );
+    }
+  }, [error]);
+
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true);
+      setErrorMessage(null);
       console.log('Iniciando login com GitHub...');
       await signIn('github', { 
         callbackUrl: '/dashboard',
@@ -32,6 +55,7 @@ export default function LoginPage() {
       });
     } catch (error) {
       console.error('Erro ao fazer login:', error);
+      setErrorMessage('Ocorreu um erro ao fazer login. Tente novamente.');
       setIsLoading(false);
     }
   };
@@ -58,23 +82,9 @@ export default function LoginPage() {
           <p className="text-center text-sm text-muted-foreground">
             Faça login com sua conta do GitHub para começar a rastrear seus commits.
           </p>
-          {error && (
+          {errorMessage && (
             <p className="text-sm text-red-500">
-              {error === 'OAuthAccountNotLinked' 
-                ? 'Esta conta do GitHub já está vinculada a outro usuário.'
-                : error === 'OAuthSignin'
-                ? 'Erro ao iniciar o processo de autenticação com o GitHub.'
-                : error === 'OAuthCallback'
-                ? 'Erro ao processar a resposta do GitHub.'
-                : error === 'OAuthCreateAccount'
-                ? 'Não foi possível criar uma conta com o GitHub.'
-                : error === 'EmailCreateAccount'
-                ? 'Não foi possível criar uma conta com o email fornecido.'
-                : error === 'Callback'
-                ? 'Erro ao processar a autenticação.'
-                : error === 'OAuthAccountNotLinked'
-                ? 'Esta conta do GitHub já está vinculada a outro usuário.'
-                : 'Ocorreu um erro ao fazer login. Tente novamente.'}
+              {errorMessage}
             </p>
           )}
           <Button
