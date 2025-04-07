@@ -43,7 +43,10 @@ function LoginContent() {
   const handleGitHubLogin = () => {
     setIsLoading(true);
     setErrorMessage(null);
-    signIn('github', { callbackUrl: '/dashboard' });
+    signIn('github', { 
+      callbackUrl: '/dashboard',
+      redirect: true
+    });
   };
 
   if (status === 'loading') {
@@ -62,13 +65,9 @@ function LoginContent() {
       <div className="w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <Image
-              src="/logo.png"
-              alt="Dev Logger Logo"
-              width={64}
-              height={64}
-              className="rounded-lg"
-            />
+            <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center">
+              <span className="text-3xl font-bold text-primary">DL</span>
+            </div>
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
             Dev Logger

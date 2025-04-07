@@ -75,7 +75,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: true,
-        domain: process.env.NODE_ENV === 'production' ? 'dev-logger.vercel.app' : undefined,
+        domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
       },
     },
     callbackUrl: {
@@ -85,7 +85,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: true,
-        domain: process.env.NODE_ENV === 'production' ? 'dev-logger.vercel.app' : undefined,
+        domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
       },
     },
     csrfToken: {
@@ -95,7 +95,7 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: true,
-        domain: process.env.NODE_ENV === 'production' ? 'dev-logger.vercel.app' : undefined,
+        domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
       },
     },
   },
@@ -169,8 +169,17 @@ export const authOptions: NextAuthOptions = {
     async redirect({ url, baseUrl }) {
       console.log("[Auth - Redirect]", { url, baseUrl });
 
-      if (url.startsWith('/')) return `${baseUrl}${url}`;
-      if (url.startsWith(baseUrl)) return url;
+      // Se a URL for relativa, adiciona o baseUrl
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      
+      // Se a URL já começar com o baseUrl, retorna ela mesma
+      if (url.startsWith(baseUrl)) {
+        return url;
+      }
+      
+      // Se for uma URL externa, redireciona para o dashboard
       return `${baseUrl}/dashboard`;
     },
   },
