@@ -8,18 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
-// Função para verificar as variáveis de ambiente
-function logEnvironmentVariables(context: string) {
-  console.log(`[${context}] Variáveis de ambiente:`, {
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    GITHUB_ID: process.env.GITHUB_ID,
-    GITHUB_SECRET: process.env.GITHUB_SECRET ? 'Definido' : 'Não definido',
-    AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
-    NODE_ENV: process.env.NODE_ENV,
-    BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
-  });
-}
-
 export default function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -29,30 +17,17 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    logEnvironmentVariables('Session Status Change');
-    console.log('Status da sessão:', status);
-    console.log('Dados da sessão:', session);
-    
-    if (status === 'authenticated') {
-      console.log('Usuário autenticado, redirecionando para o dashboard...', {
-        session: JSON.stringify(session, null, 2)
-      });
-      window.location.href = '/dashboard';
+    if (status === 'authenticated' && session) {
+      router.push('/dashboard');
     }
-  }, [status, session]);
+  }, [status, session, router]);
 
   useEffect(() => {
     if (error) {
-      logEnvironmentVariables('Error Handler');
-      console.error('Erro de autenticação:', {
-        error,
-        searchParams: Object.fromEntries(searchParams.entries())
-      });
-      
       const errorMessages: Record<string, string> = {
         OAuthAccountNotLinked: 'Esta conta do GitHub já está vinculada a outro usuário.',
-        OAuthSignin: 'Erro ao iniciar o processo de autenticação com o GitHub. Verifique se as configurações do GitHub OAuth estão corretas.',
-        OAuthCallback: 'Erro ao processar a resposta do GitHub. Verifique se as configurações do GitHub OAuth estão corretas.',
+        OAuthSignin: 'Erro ao iniciar o processo de autenticação com o GitHub.',
+        OAuthCallback: 'Erro ao processar a resposta do GitHub.',
         OAuthCreateAccount: 'Não foi possível criar uma conta com o GitHub.',
         EmailCreateAccount: 'Não foi possível criar uma conta com o email fornecido.',
         Callback: 'Erro ao processar a autenticação.',
@@ -60,24 +35,31 @@ export default function LoginPage() {
       };
 
       setErrorMessage(errorMessages[error] || errorMessages.Default);
+      setIsLoading(false);
     }
-  }, [error, searchParams]);
+  }, [error]);
 
   const handleGitHubLogin = async () => {
     try {
-      console.log('Iniciando login com GitHub...');
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      // Configuração específica para o GitHub
       const result = await signIn('github', {
-        callbackUrl: '/dashboard',
-        redirect: true,
+        redirect: false,
       });
-      
+
       if (result?.error) {
-        console.error('Erro no login:', result.error);
-        setErrorMessage(result.error);
+        setErrorMessage('Erro ao iniciar autenticação com GitHub. Tente novamente.');
+      } else {
+        // Redirecionar manualmente após autenticação bem-sucedida
+        window.location.href = '/dashboard';
       }
     } catch (error) {
       console.error('Erro ao fazer login:', error);
       setErrorMessage('Ocorreu um erro ao tentar fazer login. Por favor, tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 

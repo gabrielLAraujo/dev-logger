@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -12,10 +13,14 @@ import {
   Menu,
   X,
   FolderGit2,
-  Download
+  Download,
+  Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
+
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -86,18 +91,18 @@ export default function Navigation() {
           <div className="border-t border-border pt-4">
             <div className="flex items-center gap-3 px-4 py-2">
               {session?.user?.image ? (
-                <img
-                  src={session.user.image}
-                  alt={session.user.name || 'Avatar'}
-                  className="w-8 h-8 rounded-full"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                  <span className="text-muted-foreground">
-                    {session?.user?.name?.[0] || 'U'}
-                  </span>
-                </div>
-              )}
+                <Avatar>
+                  <AvatarImage
+                    src={session.user.image}
+                    alt={session.user.name || 'Avatar do usuário'}
+                    width={32}
+                    height={32}
+                  />
+                  <AvatarFallback>
+                    {session.user.name?.charAt(0).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              ) : null}
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">
                   {session?.user?.name || 'Usuário'}

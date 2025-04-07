@@ -1,10 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import GithubProvider from 'next-auth/providers/github';
-import GoogleProvider from 'next-auth/providers/google';
-import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from './prisma';
-import { compare } from 'bcryptjs';
 
 // Estendendo o tipo Session para incluir o accessToken
 declare module 'next-auth' {
@@ -29,7 +26,7 @@ function validateEnvVariables() {
   };
 
   const missingVars = Object.entries(requiredEnvVars)
-    .filter(([_, value]) => !value)
+    .filter(([, value]) => !value)
     .map(([key]) => key);
 
   if (missingVars.length > 0) {
@@ -45,7 +42,6 @@ function validateEnvVariables() {
     VERCEL_URL: process.env.VERCEL_URL,
   });
 
-  // Garantir que as variáveis não são undefined após a validação
   return {
     GITHUB_ID: requiredEnvVars.GITHUB_ID!,
     GITHUB_SECRET: requiredEnvVars.GITHUB_SECRET!,
@@ -54,7 +50,6 @@ function validateEnvVariables() {
   };
 }
 
-// Validar variáveis de ambiente antes de configurar o auth
 const envVars = validateEnvVariables();
 
 export const authOptions: NextAuthOptions = {
@@ -74,107 +69,76 @@ export const authOptions: NextAuthOptions = {
       clientSecret: envVars.GITHUB_SECRET,
       authorization: {
         params: {
-          redirect_uri: envVars.AUTH_REDIRECT_URL,
-          scope: 'read:user user:email'
+          prompt: 'consent',
         },
-      },
-      profile(profile) {
-        // Log apenas informações não sensíveis do perfil
-        console.log('[GitHub Profile]', {
-          id: profile.id,
-          login: profile.login,
-          name: profile.name,
-          hasEmail: !!profile.email,
-        });
-
-        if (!profile || !profile.id) {
-          console.error('Perfil do GitHub inválido');
-          throw new Error('Perfil do GitHub inválido');
-        }
-
-        return {
-          id: String(profile.id),
-          name: profile.name || profile.login,
-          email: profile.email,
-          image: profile.avatar_url,
-        };
-      },
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_ID!,
-      clientSecret: process.env.GOOGLE_SECRET!,
-    }),
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Senha', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Credenciais inválidas');
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-
-        if (!user || !user.password) {
-          throw new Error('Usuário não encontrado');
-        }
-
-        const isValid = await compare(credentials.password, user.password);
-
-        if (!isValid) {
-          throw new Error('Senha incorreta');
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        };
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       console.log("[Auth - SignIn]", {
         userId: user.id,
         provider: account?.provider,
+        profile,
         timestamp: new Date().toISOString(),
       });
       return true;
     },
     async session({ session, token }) {
+      console.log("[Auth - Session]", {
+        session,
+        token,
+        timestamp: new Date().toISOString(),
+      });
       if (session.user) {
         session.user.id = token.sub;
       }
       return session;
     },
-    async jwt({ token, account }) {
+    async jwt({ token, account, profile }) {
+      console.log("[Auth - JWT]", {
+        token,
+        account,
+        profile,
+        timestamp: new Date().toISOString(),
+      });
       if (account) {
-        console.log("[Auth - JWT]", {
-          provider: account.provider,
-          type: account.type,
-          timestamp: new Date().toISOString(),
-        });
+        token.accessToken = account.access_token;
       }
       return token;
     },
+    async redirect({ url, baseUrl }) {
+      console.log("[Auth - Redirect]", { url, baseUrl });
+      
+      // Se a URL for relativa, combine com a URL base
+      if (url.startsWith('/')) {
+        const finalUrl = `${baseUrl}${url}`;
+        console.log("[Auth - Redirect] URL relativa, redirecionando para:", finalUrl);
+        return finalUrl;
+      }
+      
+      // Se a URL for do mesmo domínio, use-a
+      if (url.startsWith(baseUrl)) {
+        console.log("[Auth - Redirect] URL do mesmo domínio, redirecionando para:", url);
+        return url;
+      }
+      
+      // Caso padrão: redirecionar para o dashboard
+      const defaultUrl = `${baseUrl}/dashboard`;
+      console.log("[Auth - Redirect] URL padrão, redirecionando para:", defaultUrl);
+      return defaultUrl;
+    },
   },
   events: {
-    async signIn({ user, account }) {
+    async signIn(message) {
       console.log('[Event - SignIn]', {
-        userId: user.id,
-        provider: account?.provider,
+        message,
         timestamp: new Date().toISOString(),
       });
     },
-    async signOut({ token }) {
+    async signOut(message) {
       console.log('[Event - SignOut]', {
-        userId: token.sub,
+        message,
         timestamp: new Date().toISOString(),
       });
     },
