@@ -3,12 +3,6 @@ import { NextResponse } from 'next/server';
 
 export default withAuth(
   function middleware(req) {
-    // Se o usuário não estiver autenticado e tentar acessar uma rota protegida,
-    // redireciona para o login
-    if (!req.nextauth.token && req.nextUrl.pathname.startsWith('/dashboard')) {
-      return NextResponse.redirect(new URL('/login', req.url));
-    }
-    
     // Adiciona headers de segurança
     const response = NextResponse.next();
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -21,17 +15,33 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ token, req }) => {
-        // Permite acesso a /login e /register sem autenticação
-        if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/register') {
+        const isAuthPage = req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/register';
+        const isProtectedRoute = req.nextUrl.pathname.startsWith('/dashboard') || 
+                                req.nextUrl.pathname.startsWith('/projects') ||
+                                req.nextUrl.pathname.startsWith('/settings');
+
+        // Se estiver em uma página de autenticação e já estiver logado, permite o acesso
+        if (isAuthPage && token) {
           return true;
         }
-        // Exige autenticação para outras rotas
-        return !!token;
+
+        // Se estiver em uma rota protegida, exige autenticação
+        if (isProtectedRoute) {
+          return !!token;
+        }
+
+        return true;
       },
     },
   }
 );
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/onboarding/:path*', '/projects/:path*', '/settings/:path*'],
+  matcher: [
+    '/dashboard/:path*',
+    '/projects/:path*',
+    '/settings/:path*',
+    '/login',
+    '/register'
+  ],
 }; 

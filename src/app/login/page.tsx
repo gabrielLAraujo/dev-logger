@@ -7,6 +7,7 @@ import { Github } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import Image from 'next/image';
 
 function LoginContent() {
   const { data: session, status } = useSession();
@@ -47,7 +48,7 @@ function LoginContent() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background/80">
         <div className="text-center">
           <Skeleton className="h-12 w-12 rounded-full mx-auto" />
           <Skeleton className="h-4 w-48 mt-4 mx-auto" />
@@ -57,28 +58,43 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background/80">
+      <div className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Bem-vindo ao Dev Logger</h1>
-          <p className="text-gray-600 mt-2">Faça login para continuar</p>
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo.png"
+              alt="Dev Logger Logo"
+              width={64}
+              height={64}
+              className="rounded-lg"
+            />
+          </div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+            Dev Logger
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Acompanhe seus commits e repositórios do GitHub
+          </p>
         </div>
 
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-            {errorMessage}
-          </div>
-        )}
+        <Card className="p-6 border-border/40 bg-card/50 backdrop-blur-sm">
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+              {errorMessage}
+            </div>
+          )}
 
-        <Button
-          onClick={handleGitHubLogin}
-          disabled={isLoading}
-          className="w-full flex items-center justify-center gap-2"
-        >
-          <Github className="h-5 w-5" />
-          {isLoading ? 'Entrando...' : 'Entrar com GitHub'}
-        </Button>
-      </Card>
+          <Button
+            onClick={handleGitHubLogin}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 bg-[#24292f] hover:bg-[#24292f]/90 text-white"
+          >
+            <Github className="h-5 w-5" />
+            {isLoading ? 'Entrando...' : 'Entrar com GitHub'}
+          </Button>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -86,7 +102,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background/80">
         <div className="text-center">
           <Skeleton className="h-12 w-12 rounded-full mx-auto" />
           <Skeleton className="h-4 w-48 mt-4 mx-auto" />
