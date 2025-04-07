@@ -20,6 +20,7 @@ declare module 'next-auth' {
 }
 
 export const authOptions: NextAuthOptions = {
+  debug: true, // Habilitando o modo debug
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt',
@@ -39,8 +40,9 @@ export const authOptions: NextAuthOptions = {
         },
       },
       profile(profile) {
-        console.log('GitHub profile:', profile);
+        console.log('GitHub profile:', JSON.stringify(profile, null, 2));
         if (!profile || !profile.id) {
+          console.error('Perfil do GitHub inválido:', profile);
           throw new Error('Perfil do GitHub inválido');
         }
         return {
@@ -91,11 +93,19 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log('SignIn callback:', { user, account, profile });
+      console.log('SignIn callback:', {
+        user: JSON.stringify(user, null, 2),
+        account: JSON.stringify(account, null, 2),
+        profile: JSON.stringify(profile, null, 2)
+      });
       return true;
     },
     async session({ session, token, user }) {
-      console.log('Session callback:', { session, token, user });
+      console.log('Session callback:', {
+        session: JSON.stringify(session, null, 2),
+        token: JSON.stringify(token, null, 2),
+        user: JSON.stringify(user, null, 2)
+      });
       
       if (session.user) {
         session.user.id = token.sub;
@@ -122,16 +132,25 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    async jwt({ token, account, profile }) {
-      console.log('JWT callback:', { token, account, profile });
+    async jwt({ token, user, account }) {
+      console.log('JWT callback:', {
+        token: JSON.stringify(token, null, 2),
+        user: JSON.stringify(user, null, 2),
+        account: JSON.stringify(account, null, 2)
+      });
       
-      // Se temos um account, significa que o usuário acabou de fazer login
       if (account) {
         token.accessToken = account.access_token;
       }
-      
       return token;
     },
   },
-  debug: true, // Habilitando debug para ver mais informações sobre os erros
+  events: {
+    async signIn(message) {
+      console.log('SignIn event:', JSON.stringify(message, null, 2));
+    },
+    async signOut(message) {
+      console.log('SignOut event:', JSON.stringify(message, null, 2));
+    },
+  },
 }; 

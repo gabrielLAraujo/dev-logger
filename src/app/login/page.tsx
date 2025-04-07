@@ -18,41 +18,49 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      console.log('Usuário autenticado, redirecionando para o dashboard...');
+      console.log('Usuário autenticado, redirecionando para o dashboard...', {
+        session: JSON.stringify(session, null, 2)
+      });
       window.location.href = '/dashboard';
     }
-  }, [status]);
+  }, [status, session]);
 
   useEffect(() => {
     if (error) {
-      console.error('Erro de autenticação:', error);
-      setErrorMessage(
-        error === 'OAuthAccountNotLinked' 
-          ? 'Esta conta do GitHub já está vinculada a outro usuário.'
-          : error === 'OAuthSignin'
-          ? 'Erro ao iniciar o processo de autenticação com o GitHub.'
-          : error === 'OAuthCallback'
-          ? 'Erro ao processar a resposta do GitHub. Verifique se as configurações do GitHub OAuth estão corretas.'
-          : error === 'OAuthCreateAccount'
-          ? 'Não foi possível criar uma conta com o GitHub.'
-          : error === 'EmailCreateAccount'
-          ? 'Não foi possível criar uma conta com o email fornecido.'
-          : error === 'Callback'
-          ? 'Erro ao processar a autenticação.'
-          : 'Ocorreu um erro ao fazer login. Tente novamente.'
-      );
+      console.error('Erro de autenticação:', {
+        error,
+        searchParams: Object.fromEntries(searchParams.entries())
+      });
+      
+      const errorMessages: Record<string, string> = {
+        OAuthAccountNotLinked: 'Esta conta do GitHub já está vinculada a outro usuário.',
+        OAuthSignin: 'Erro ao iniciar o processo de autenticação com o GitHub. Verifique se as configurações do GitHub OAuth estão corretas.',
+        OAuthCallback: 'Erro ao processar a resposta do GitHub. Verifique se as configurações do GitHub OAuth estão corretas.',
+        OAuthCreateAccount: 'Não foi possível criar uma conta com o GitHub.',
+        EmailCreateAccount: 'Não foi possível criar uma conta com o email fornecido.',
+        Callback: 'Erro ao processar a autenticação.',
+        Default: 'Ocorreu um erro ao fazer login. Tente novamente.'
+      };
+
+      setErrorMessage(errorMessages[error] || errorMessages.Default);
     }
-  }, [error]);
+  }, [error, searchParams]);
 
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true);
       setErrorMessage(null);
-      console.log('Iniciando login com GitHub...');
-      await signIn('github', { 
+      console.log('Iniciando login com GitHub...', {
         callbackUrl: '/dashboard',
         redirect: true
       });
+      
+      const result = await signIn('github', { 
+        callbackUrl: '/dashboard',
+        redirect: true
+      });
+      
+      console.log('Resultado do login:', result);
     } catch (error) {
       console.error('Erro ao fazer login:', error);
       setErrorMessage('Ocorreu um erro ao fazer login. Tente novamente.');
