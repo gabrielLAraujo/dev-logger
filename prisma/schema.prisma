@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   @db.Text
+  accounts      Account[]
+  sessions      Session[]
+  commits       Commit[]
+  settings      UserSettings?
+  projects      Project[]
+}
+
+model UserSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  workStartTime     String   @default("09:00")
+  workEndTime       String   @default("18:00")
+  workDays          String[] @default(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"])
+  monitoredRepos    String[] @default([])
+  githubAccessToken String?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Commit {
+  id          String   @id @default(cuid())
+  hash        String
+  message     String
+  repository  String
+  url         String
+  createdAt   DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([hash, repository])
+}
+
+model Project {
+  id            String           @id @default(cuid())
+  name          String
+  description   String?
+  repositories  String[]
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workSchedule  WorkSchedule[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model WorkSchedule {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dayOfWeek Int      // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  startTime String   // Formato: "HH:mm"
+  endTime   String   // Formato: "HH:mm"
+  isWorkDay Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, dayOfWeek])
+}
