@@ -8,6 +8,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
+// Função para verificar as variáveis de ambiente
+function logEnvironmentVariables(context: string) {
+  console.log(`[${context}] Variáveis de ambiente:`, {
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    GITHUB_ID: process.env.GITHUB_ID,
+    GITHUB_SECRET: process.env.GITHUB_SECRET ? 'Definido' : 'Não definido',
+    AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
+    NODE_ENV: process.env.NODE_ENV,
+    BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
+  });
+}
+
 export default function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -17,6 +29,7 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    logEnvironmentVariables('Session Status Change');
     console.log('Status da sessão:', status);
     console.log('Dados da sessão:', session);
     
@@ -30,6 +43,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (error) {
+      logEnvironmentVariables('Error Handler');
       console.error('Erro de autenticação:', {
         error,
         searchParams: Object.fromEntries(searchParams.entries())
@@ -54,13 +68,16 @@ export default function LoginPage() {
       setIsLoading(true);
       setErrorMessage(null);
       
+      logEnvironmentVariables('GitHub Login');
       console.log('Iniciando login com GitHub...', {
         callbackUrl: '/dashboard',
         redirect: true,
         env: {
           NEXTAUTH_URL: process.env.NEXTAUTH_URL,
           GITHUB_ID: process.env.GITHUB_ID,
-          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL
+          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
+          VERCEL_URL: process.env.VERCEL_URL,
+          BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
         }
       });
       

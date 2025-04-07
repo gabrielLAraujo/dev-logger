@@ -19,6 +19,18 @@ declare module 'next-auth' {
   }
 }
 
+// Função para verificar as variáveis de ambiente
+function logEnvironmentVariables(context: string) {
+  console.log(`[${context}] Variáveis de ambiente:`, {
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    GITHUB_ID: process.env.GITHUB_ID,
+    GITHUB_SECRET: process.env.GITHUB_SECRET ? 'Definido' : 'Não definido',
+    AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
+    NODE_ENV: process.env.NODE_ENV,
+    BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
+  });
+}
+
 export const authOptions: NextAuthOptions = {
   debug: true, // Habilitando o modo debug
   adapter: PrismaAdapter(prisma),
@@ -40,6 +52,7 @@ export const authOptions: NextAuthOptions = {
         },
       },
       profile(profile) {
+        logEnvironmentVariables('GitHub Profile');
         console.log('GitHub profile:', JSON.stringify(profile, null, 2));
         if (!profile || !profile.id) {
           console.error('Perfil do GitHub inválido:', profile);
@@ -93,6 +106,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
+      logEnvironmentVariables('SignIn Callback');
       console.log('SignIn callback:', {
         user: JSON.stringify(user, null, 2),
         account: JSON.stringify(account, null, 2),
@@ -100,12 +114,15 @@ export const authOptions: NextAuthOptions = {
         env: {
           NEXTAUTH_URL: process.env.NEXTAUTH_URL,
           GITHUB_ID: process.env.GITHUB_ID,
-          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL
+          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
+          VERCEL_URL: process.env.VERCEL_URL,
+          BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
         }
       });
       return true;
     },
     async session({ session, token, user }) {
+      logEnvironmentVariables('Session Callback');
       console.log('Session callback:', {
         session: JSON.stringify(session, null, 2),
         token: JSON.stringify(token, null, 2),
@@ -118,6 +135,7 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async jwt({ token, user, account }) {
+      logEnvironmentVariables('JWT Callback');
       console.log('JWT callback:', {
         token: JSON.stringify(token, null, 2),
         user: JSON.stringify(user, null, 2),
@@ -132,9 +150,11 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async signIn(message) {
+      logEnvironmentVariables('SignIn Event');
       console.log('SignIn event:', JSON.stringify(message, null, 2));
     },
     async signOut(message) {
+      logEnvironmentVariables('SignOut Event');
       console.log('SignOut event:', JSON.stringify(message, null, 2));
     },
   },
