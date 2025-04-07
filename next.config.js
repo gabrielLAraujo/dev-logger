@@ -16,6 +16,20 @@ const nextConfig = {
     };
     return config;
   },
+  // Configurações para garantir que os cookies funcionem corretamente
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig; 
