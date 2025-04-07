@@ -61,7 +61,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/login',
-    error: '/login',
+    error: '/auth/error',
   },
   providers: [
     GithubProvider({
@@ -71,6 +71,19 @@ export const authOptions: NextAuthOptions = {
         params: {
           prompt: 'consent',
         },
+      },
+      profile(profile) {
+        // Verificar se o email está presente, caso contrário, usar um email padrão
+        if (!profile.email) {
+          console.warn(`[Auth] Email ausente para o usuário ${profile.login}, usando email padrão`);
+        }
+        
+        return {
+          id: String(profile.id),
+          name: profile.name || profile.login,
+          email: profile.email || `${profile.login}@users.noreply.github.com`,
+          image: profile.avatar_url,
+        };
       },
     }),
   ],
