@@ -36,6 +36,7 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           scope: "read:user user:email repo",
+          redirect_uri: process.env.AUTH_REDIRECT_URL,
         },
       },
       profile(profile) {
