@@ -1,25 +1,26 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
+import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         message: 'Sessão não encontrada',
         cookies: await getCookiesInfo()
       }, { status: 401 });
     }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       session,
       cookies: await getCookiesInfo()
     });
   } catch (error) {
     console.error('[Debug Session] Erro ao obter sessão:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Erro ao obter sessão',
       details: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
@@ -28,18 +29,22 @@ export async function GET() {
 
 async function getCookiesInfo() {
   try {
-    const { cookies } = await import('next/headers');
     const cookieStore = cookies();
-    const sessionToken = cookieStore.get('__Secure-next-auth.session-token');
-    
+
+    const all = cookieStore.getAll();
+    const sessionToken = all.find(c =>
+      c.name === 'next-auth.session-token' ||
+      c.name === '__Secure-next-auth.session-token'
+    );
+
     return {
       sessionToken: sessionToken ? {
         name: sessionToken.name,
-        value: sessionToken.value.substring(0, 10) + '...',
+        value: sessionToken.value?.substring(0, 10) + '...',
       } : null,
-      allCookies: Array.from(cookieStore.getAll()).map(cookie => ({
+      allCookies: all.map(cookie => ({
         name: cookie.name,
-        value: cookie.value.substring(0, 10) + '...',
+        value: cookie.value?.substring(0, 10) + '...',
       })),
       env: {
         NEXTAUTH_URL: process.env.NEXTAUTH_URL,
@@ -51,4 +56,4 @@ async function getCookiesInfo() {
     console.error('[Debug Session] Erro ao obter cookies:', error);
     return { error: 'Erro ao obter cookies' };
   }
-} 
+}
