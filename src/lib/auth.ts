@@ -132,5 +132,5 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
   },
-  debug: true,
+  debug: process.env.NODE_ENV === 'development',
 }; 

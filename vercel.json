@@ -4,6 +4,7 @@
   "framework": "nextjs",
   "regions": ["gru1"],
   "env": {
-    "NEXTAUTH_URL": "https://dev-logger.vercel.app"
+    "NEXTAUTH_URL": "https://dev-logger.vercel.app",
+    "NODE_ENV": "production"
   }
 } 
