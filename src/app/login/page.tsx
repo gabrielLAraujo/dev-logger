@@ -39,29 +39,11 @@ export default function LoginPage() {
     }
   }, [error]);
 
-  const handleGitHubLogin = async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      // Configuração específica para o GitHub
-      const result = await signIn('github', {
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setErrorMessage('Erro ao iniciar autenticação com GitHub. Tente novamente.');
-      } else {
-        // Redirecionar manualmente após autenticação bem-sucedida
-        window.location.href = '/dashboard';
-      }
-    } catch (error) {
-      console.error('Erro ao fazer login:', error);
-      setErrorMessage('Ocorreu um erro ao tentar fazer login. Por favor, tente novamente.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleGitHubLogin = () => {
+    setIsLoading(true);
+    signIn('github', { callbackUrl: '/dashboard' });
   };
+  
 
   if (status === 'loading') {
     return (
