@@ -65,38 +65,19 @@ export default function LoginPage() {
 
   const handleGitHubLogin = async () => {
     try {
-      setIsLoading(true);
-      setErrorMessage(null);
-      
-      logEnvironmentVariables('GitHub Login');
-      console.log('Iniciando login com GitHub...', {
+      console.log('Iniciando login com GitHub...');
+      const result = await signIn('github', {
         callbackUrl: '/dashboard',
         redirect: true,
-        env: {
-          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-          GITHUB_ID: process.env.GITHUB_ID,
-          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
-          VERCEL_URL: process.env.VERCEL_URL,
-          BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
-        }
       });
       
-      const result = await signIn('github', { 
-        callbackUrl: '/dashboard',
-        redirect: true
-      });
-      
-      console.log('Resultado do login:', result);
-      
-      if (!result) {
-        console.error('Resultado do login é undefined');
-        setErrorMessage('Erro ao iniciar o processo de login. Verifique as configurações do GitHub OAuth.');
+      if (result?.error) {
+        console.error('Erro no login:', result.error);
+        setErrorMessage(result.error);
       }
     } catch (error) {
       console.error('Erro ao fazer login:', error);
-      setErrorMessage('Ocorreu um erro ao fazer login. Tente novamente.');
-    } finally {
-      setIsLoading(false);
+      setErrorMessage('Ocorreu um erro ao tentar fazer login. Por favor, tente novamente.');
     }
   };
 

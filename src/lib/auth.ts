@@ -58,7 +58,7 @@ function validateEnvVariables() {
 const envVars = validateEnvVariables();
 
 export const authOptions: NextAuthOptions = {
-  debug: true, // Habilitando o modo debug
+  debug: true,
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt',
@@ -78,11 +78,19 @@ export const authOptions: NextAuthOptions = {
         },
       },
       profile(profile) {
-        console.log('GitHub profile:', JSON.stringify(profile, null, 2));
+        // Log apenas informações não sensíveis do perfil
+        console.log('[GitHub Profile]', {
+          id: profile.id,
+          login: profile.login,
+          name: profile.name,
+          hasEmail: !!profile.email,
+        });
+
         if (!profile || !profile.id) {
-          console.error('Perfil do GitHub inválido:', profile);
+          console.error('Perfil do GitHub inválido');
           throw new Error('Perfil do GitHub inválido');
         }
+
         return {
           id: String(profile.id),
           name: profile.name || profile.login,
@@ -130,49 +138,44 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
-      console.log("[Auth Callback - SignIn]", {
-        user,
-        accountType: account?.provider,
-        profile,
-        env: {
-          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-          AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
-          NODE_ENV: process.env.NODE_ENV,
-        },
+    async signIn({ user, account }) {
+      console.log("[Auth - SignIn]", {
+        userId: user.id,
+        provider: account?.provider,
+        timestamp: new Date().toISOString(),
       });
       return true;
     },
     async session({ session, token }) {
-      console.log("[Auth Callback - Session]", {
-        session,
-        token,
-        env: {
-          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-          NODE_ENV: process.env.NODE_ENV,
-        },
-      });
+      if (session.user) {
+        session.user.id = token.sub;
+      }
       return session;
     },
-    async jwt({ token, account, profile }) {
-      console.log("[Auth Callback - JWT]", {
-        token,
-        accountType: account?.provider,
-        profile,
-        env: {
-          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-          NODE_ENV: process.env.NODE_ENV,
-        },
-      });
+    async jwt({ token, account }) {
+      if (account) {
+        console.log("[Auth - JWT]", {
+          provider: account.provider,
+          type: account.type,
+          timestamp: new Date().toISOString(),
+        });
+      }
       return token;
     },
   },
   events: {
-    async signIn(message) {
-      console.log('SignIn event:', JSON.stringify(message, null, 2));
+    async signIn({ user, account }) {
+      console.log('[Event - SignIn]', {
+        userId: user.id,
+        provider: account?.provider,
+        timestamp: new Date().toISOString(),
+      });
     },
-    async signOut(message) {
-      console.log('SignOut event:', JSON.stringify(message, null, 2));
+    async signOut({ token }) {
+      console.log('[Event - SignOut]', {
+        userId: token.sub,
+        timestamp: new Date().toISOString(),
+      });
     },
   },
 }; 
