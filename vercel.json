@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm install && npm run build",
-  "installCommand": "npm install",
+  "buildCommand": "npm install --production=false && npm run build",
+  "installCommand": "npm install --production=false",
   "framework": "nextjs",
   "regions": ["gru1"],
   "env": {
