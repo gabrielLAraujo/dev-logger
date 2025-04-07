@@ -36,38 +36,31 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       console.log('Usuário não autenticado, redirecionando para o login...');
-      window.location.href = '/login';
-    }
-  }, [status]);
-
-  useEffect(() => {
-    if (status === 'authenticated') {
+      router.replace('/login');
+    } else if (status === 'authenticated') {
       console.log('Usuário autenticado, buscando dados...');
       console.log('Dados da sessão:', session);
+      
+      const fetchRepositories = async () => {
+        try {
+          setLoading(true);
+          const response = await fetch('/api/github/repositories');
+          if (!response.ok) {
+            throw new Error('Falha ao buscar repositórios');
+          }
+          const data = await response.json();
+          setRepositories(data);
+        } catch (error) {
+          console.error('Erro ao buscar repositórios:', error);
+          setError('Erro ao buscar repositórios');
+        } finally {
+          setLoading(false);
+        }
+      };
+
       fetchRepositories();
     }
-  }, [status, session]);
-
-  const fetchRepositories = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/github/repositories');
-      if (!response.ok) {
-        throw new Error('Falha ao buscar repositórios');
-      }
-      const data = await response.json();
-      setRepositories(data);
-    } catch (error) {
-      console.error('Erro ao buscar repositórios:', error);
-      setError('Erro ao buscar repositórios');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRepositories();
-  }, [fetchRepositories]);
+  }, [status, router, session]);
 
   const fetchCommits = async (repo: Repository) => {
     try {
@@ -119,8 +112,10 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Button onClick={handleCreateProject} className="flex items-center">
+        <h1 className="text-2xl font-bold">
+          Olá, {session?.user?.name || 'usuário'}!
+        </h1>
+        <Button onClick={handleCreateProject}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Projeto
         </Button>

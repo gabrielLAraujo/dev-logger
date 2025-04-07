@@ -14,15 +14,14 @@ declare module 'next-auth' {
       image?: string | null;
     };
   }
-  
-  // Estendendo o tipo JWT para incluir o accessToken
+
   interface JWT {
     id?: string;
     accessToken?: string;
   }
 }
 
-// Função para validar variáveis de ambiente obrigatórias
+// Validação de variáveis de ambiente
 function validateEnvVariables() {
   const requiredEnvVars = {
     GITHUB_ID: process.env.GITHUB_ID,
@@ -66,7 +65,7 @@ export const authOptions: NextAuthOptions = {
   secret: envVars.NEXTAUTH_SECRET,
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 dias
+    maxAge: 30 * 24 * 60 * 60,
   },
   cookies: {
     sessionToken: {
@@ -75,7 +74,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: true,
+        secure: process.env.NODE_ENV === 'production',
       },
     },
   },
@@ -93,11 +92,10 @@ export const authOptions: NextAuthOptions = {
         },
       },
       profile(profile) {
-        // Verificar se o email está presente, caso contrário, usar um email padrão
         if (!profile.email) {
           console.warn(`[Auth] Email ausente para o usuário ${profile.login}, usando email padrão`);
         }
-        
+
         return {
           id: String(profile.id),
           name: profile.name || profile.login,
@@ -123,10 +121,12 @@ export const authOptions: NextAuthOptions = {
         token,
         timestamp: new Date().toISOString(),
       });
+
       if (token && session.user) {
         session.user.id = token.sub;
         session.accessToken = token.accessToken as string | undefined;
       }
+
       return session;
     },
     async jwt({ token, user, account }) {
@@ -136,32 +136,20 @@ export const authOptions: NextAuthOptions = {
         account,
         timestamp: new Date().toISOString(),
       });
+
       if (account && user) {
         token.id = user.id;
         token.accessToken = account.access_token;
       }
+
       return token;
     },
     async redirect({ url, baseUrl }) {
       console.log("[Auth - Redirect]", { url, baseUrl });
-      
-      // Se a URL for relativa, combine com a URL base
-      if (url.startsWith('/')) {
-        const finalUrl = `${baseUrl}${url}`;
-        console.log("[Auth - Redirect] URL relativa, redirecionando para:", finalUrl);
-        return finalUrl;
-      }
-      
-      // Se a URL for do mesmo domínio, use-a
-      if (url.startsWith(baseUrl)) {
-        console.log("[Auth - Redirect] URL do mesmo domínio, redirecionando para:", url);
-        return url;
-      }
-      
-      // Caso padrão: redirecionar para o dashboard
-      const defaultUrl = `${baseUrl}/dashboard`;
-      console.log("[Auth - Redirect] URL padrão, redirecionando para:", defaultUrl);
-      return defaultUrl;
+
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return `${baseUrl}/dashboard`;
     },
   },
   events: {
@@ -178,4 +166,4 @@ export const authOptions: NextAuthOptions = {
       });
     },
   },
-}; 
+};
