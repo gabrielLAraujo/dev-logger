@@ -19,17 +19,43 @@ declare module 'next-auth' {
   }
 }
 
-// Função para verificar as variáveis de ambiente
-function logEnvironmentVariables(context: string) {
-  console.log(`[${context}] Variáveis de ambiente:`, {
+// Função para validar variáveis de ambiente obrigatórias
+function validateEnvVariables() {
+  const requiredEnvVars = {
+    GITHUB_ID: process.env.GITHUB_ID,
+    GITHUB_SECRET: process.env.GITHUB_SECRET,
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
+  };
+
+  const missingVars = Object.entries(requiredEnvVars)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingVars.length > 0) {
+    console.error(`[Auth Config] Variáveis de ambiente ausentes: ${missingVars.join(", ")}`);
+    throw new Error(`Variáveis de ambiente obrigatórias ausentes: ${missingVars.join(", ")}`);
+  }
+
+  console.log("[Auth Config] Todas as variáveis de ambiente necessárias estão presentes", {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     GITHUB_ID: process.env.GITHUB_ID,
-    GITHUB_SECRET: process.env.GITHUB_SECRET ? 'Definido' : 'Não definido',
     AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
     NODE_ENV: process.env.NODE_ENV,
-    BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
+    VERCEL_URL: process.env.VERCEL_URL,
   });
+
+  // Garantir que as variáveis não são undefined após a validação
+  return {
+    GITHUB_ID: requiredEnvVars.GITHUB_ID!,
+    GITHUB_SECRET: requiredEnvVars.GITHUB_SECRET!,
+    NEXTAUTH_URL: requiredEnvVars.NEXTAUTH_URL!,
+    AUTH_REDIRECT_URL: requiredEnvVars.AUTH_REDIRECT_URL!,
+  };
 }
+
+// Validar variáveis de ambiente antes de configurar o auth
+const envVars = validateEnvVariables();
 
 export const authOptions: NextAuthOptions = {
   debug: true, // Habilitando o modo debug
@@ -44,15 +70,14 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     GithubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
+      clientId: envVars.GITHUB_ID,
+      clientSecret: envVars.GITHUB_SECRET,
       authorization: {
         params: {
-          scope: "read:user user:email repo",
+          redirect_uri: envVars.AUTH_REDIRECT_URL,
         },
       },
       profile(profile) {
-        logEnvironmentVariables('GitHub Profile');
         console.log('GitHub profile:', JSON.stringify(profile, null, 2));
         if (!profile || !profile.id) {
           console.error('Perfil do GitHub inválido:', profile);
@@ -106,55 +131,47 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      logEnvironmentVariables('SignIn Callback');
-      console.log('SignIn callback:', {
-        user: JSON.stringify(user, null, 2),
-        account: JSON.stringify(account, null, 2),
-        profile: JSON.stringify(profile, null, 2),
+      console.log("[Auth Callback - SignIn]", {
+        user,
+        accountType: account?.provider,
+        profile,
         env: {
           NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-          GITHUB_ID: process.env.GITHUB_ID,
           AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
-          VERCEL_URL: process.env.VERCEL_URL,
-          BASE_URL: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL,
-        }
+          NODE_ENV: process.env.NODE_ENV,
+        },
       });
       return true;
     },
-    async session({ session, token, user }) {
-      logEnvironmentVariables('Session Callback');
-      console.log('Session callback:', {
-        session: JSON.stringify(session, null, 2),
-        token: JSON.stringify(token, null, 2),
-        user: JSON.stringify(user, null, 2)
+    async session({ session, token }) {
+      console.log("[Auth Callback - Session]", {
+        session,
+        token,
+        env: {
+          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+          NODE_ENV: process.env.NODE_ENV,
+        },
       });
-      
-      if (session.user) {
-        session.user.id = token.sub;
-      }
       return session;
     },
-    async jwt({ token, user, account }) {
-      logEnvironmentVariables('JWT Callback');
-      console.log('JWT callback:', {
-        token: JSON.stringify(token, null, 2),
-        user: JSON.stringify(user, null, 2),
-        account: JSON.stringify(account, null, 2)
+    async jwt({ token, account, profile }) {
+      console.log("[Auth Callback - JWT]", {
+        token,
+        accountType: account?.provider,
+        profile,
+        env: {
+          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+          NODE_ENV: process.env.NODE_ENV,
+        },
       });
-      
-      if (account) {
-        token.accessToken = account.access_token;
-      }
       return token;
     },
   },
   events: {
     async signIn(message) {
-      logEnvironmentVariables('SignIn Event');
       console.log('SignIn event:', JSON.stringify(message, null, 2));
     },
     async signOut(message) {
-      logEnvironmentVariables('SignOut Event');
       console.log('SignOut event:', JSON.stringify(message, null, 2));
     },
   },
