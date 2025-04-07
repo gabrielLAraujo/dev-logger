@@ -69,12 +69,12 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name: 'next-auth.session-token', // removido o __Secure-
+      name: 'next-auth.session-token',
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: false, // 🔥 DESABILITADO TEMPORARIAMENTE para funcionar em dev e Vercel subdomínios
+        secure: false, // importante para subdomínio Vercel
       },
     },
   },
