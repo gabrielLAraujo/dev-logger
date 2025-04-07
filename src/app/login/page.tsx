@@ -45,7 +45,12 @@ function LoginContent() {
     setErrorMessage(null);
     signIn('github', { 
       callbackUrl: '/dashboard',
-      redirect: true
+      redirect: false
+    }).then((result) => {
+      if (result?.error) {
+        setErrorMessage('Erro ao fazer login com GitHub. Tente novamente.');
+        setIsLoading(false);
+      }
     });
   };
 
