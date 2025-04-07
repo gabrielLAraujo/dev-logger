@@ -8,7 +8,7 @@
     "NODE_ENV": "production",
     "AUTH_REDIRECT_URL": "https://dev-logger.vercel.app/api/auth/callback/github",
     "GITHUB_ID": "Ov23liXLE10d9ggSxpoa",
-    "GITHUB_SECRET": "0626b9c0a001d2077d4f2c00f02cfa390699b3fc",
+    "GITHUB_SECRET": "43ccc607b26b7f033db4e9f1a9fd68adbb3cde8c",
     "NEXTAUTH_SECRET": "+lSlbLzdrqTd0GsLLT64RdC41a4BfMh6cHAvZE2ugeg=",
     "DATABASE_URL": "postgresql://neondb_owner:npg_rIRhQUeM9CP0@ep-round-unit-a5dczncp-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
   }
