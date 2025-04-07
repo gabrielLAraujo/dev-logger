@@ -14,6 +14,12 @@ declare module 'next-auth' {
       image?: string | null;
     };
   }
+  
+  // Estendendo o tipo JWT para incluir o accessToken
+  interface JWT {
+    id?: string;
+    accessToken?: string;
+  }
 }
 
 // Função para validar variáveis de ambiente obrigatórias
@@ -23,6 +29,7 @@ function validateEnvVariables() {
     GITHUB_SECRET: process.env.GITHUB_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     AUTH_REDIRECT_URL: process.env.AUTH_REDIRECT_URL,
+    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   };
 
   const missingVars = Object.entries(requiredEnvVars)
@@ -47,6 +54,7 @@ function validateEnvVariables() {
     GITHUB_SECRET: requiredEnvVars.GITHUB_SECRET!,
     NEXTAUTH_URL: requiredEnvVars.NEXTAUTH_URL!,
     AUTH_REDIRECT_URL: requiredEnvVars.AUTH_REDIRECT_URL!,
+    NEXTAUTH_SECRET: requiredEnvVars.NEXTAUTH_SECRET!,
   };
 }
 
@@ -55,9 +63,21 @@ const envVars = validateEnvVariables();
 export const authOptions: NextAuthOptions = {
   debug: true,
   adapter: PrismaAdapter(prisma),
+  secret: envVars.NEXTAUTH_SECRET,
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 dias
+  },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+      },
+    },
   },
   pages: {
     signIn: '/login',
@@ -103,19 +123,21 @@ export const authOptions: NextAuthOptions = {
         token,
         timestamp: new Date().toISOString(),
       });
-      if (session.user) {
+      if (token && session.user) {
         session.user.id = token.sub;
+        session.accessToken = token.accessToken as string | undefined;
       }
       return session;
     },
-    async jwt({ token, account, profile }) {
+    async jwt({ token, user, account }) {
       console.log("[Auth - JWT]", {
         token,
+        user,
         account,
-        profile,
         timestamp: new Date().toISOString(),
       });
-      if (account) {
+      if (account && user) {
+        token.id = user.id;
         token.accessToken = account.access_token;
       }
       return token;
