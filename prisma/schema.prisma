@@ -44,6 +44,7 @@ model User {
   Project       Project[]
   sessions      Session[]
   settings      UserSettings?
+
 }
 
 model VerificationToken {
