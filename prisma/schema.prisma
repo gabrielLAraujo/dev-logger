@@ -64,6 +64,21 @@ model Log {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
+model Commit {
+  id          String   @id @default(cuid())
+  sha         String
+  message     String
+  authorName  String
+  authorDate  DateTime
+  htmlUrl     String
+  projectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([sha, projectId], name: "sha_projectId")
+}
+
 model Project {
   id           String         @id @default(cuid())
   name         String
@@ -76,6 +91,7 @@ model Project {
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   WorkSchedule WorkSchedule[]
   logs         Log[]
+  commits      Commit[]
 }
 
 model UserSettings {

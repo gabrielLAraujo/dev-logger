@@ -76,20 +76,19 @@ export async function POST(
         for (const commit of commits) {
           try {
             const commitData = {
-              hash: commit.sha,
+              sha: commit.sha,
               message: commit.commit.message,
-              repository: repo,
-              url: commit.html_url,
+              authorName: commit.commit.author.name,
+              authorDate: new Date(commit.commit.author.date),
+              htmlUrl: commit.html_url,
               projectId: project.id,
-              userId: session.user.id,
-              createdAt: new Date(commit.commit.author.date),
             };
 
             await prisma.commit.upsert({
               where: {
-                hash_repository: {
-                  hash: commitData.hash,
-                  repository: commitData.repository,
+                sha_projectId: {
+                  sha: commitData.sha,
+                  projectId: commitData.projectId,
                 },
               },
               update: commitData,

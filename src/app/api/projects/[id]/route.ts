@@ -23,12 +23,6 @@ export async function GET(
       },
       include: {
         WorkSchedule: true,
-        commits: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 10,
-        },
       },
     });
 

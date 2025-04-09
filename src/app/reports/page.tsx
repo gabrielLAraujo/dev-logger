@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import ProjectReport from '@/components/ProjectReport';
-import { Project, Commit, WorkSchedule } from '@prisma/client';
+import { Project, WorkSchedule } from '@prisma/client';
 
 type ProjectWithRelations = Project & {
-  commits: Commit[];
   WorkSchedule: WorkSchedule[];
 };
 
@@ -22,7 +21,6 @@ export default async function ReportsPage() {
       userId: session.user.id,
     },
     include: {
-      commits: true,
       WorkSchedule: true,
     },
   }) as ProjectWithRelations[];

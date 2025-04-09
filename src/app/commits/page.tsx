@@ -13,14 +13,23 @@ export default async function CommitsPage() {
 
   const commits = await prisma.commit.findMany({
     where: {
-      user: {
-        email: session.user.email
+      project: {
+        user: {
+          email: session.user.email
+        }
       }
     },
     orderBy: {
-      createdAt: 'desc'
+      authorDate: 'desc'
     },
-    take: 50
+    take: 50,
+    include: {
+      project: {
+        select: {
+          name: true
+        }
+      }
+    }
   });
 
   return (

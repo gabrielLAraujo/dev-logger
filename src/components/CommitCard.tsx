@@ -3,7 +3,11 @@
 import { Commit } from '@prisma/client';
 
 interface CommitCardProps {
-  commit: Commit;
+  commit: Commit & {
+    project: {
+      name: string;
+    };
+  };
 }
 
 export default function CommitCard({ commit }: CommitCardProps) {
@@ -15,7 +19,7 @@ export default function CommitCard({ commit }: CommitCardProps) {
             {commit.message}
           </h3>
           <a 
-            href={commit.url}
+            href={commit.htmlUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
@@ -24,12 +28,13 @@ export default function CommitCard({ commit }: CommitCardProps) {
           </a>
         </div>
         <div className="mt-2 text-sm text-gray-500">
-          <p>Repositório: {commit.repository}</p>
-          <p>Hash: {commit.hash}</p>
+          <p>Projeto: {commit.project.name}</p>
+          <p>Autor: {commit.authorName}</p>
+          <p>SHA: {commit.sha.substring(0, 7)}</p>
         </div>
         <div className="mt-4 flex items-center justify-between">
           <div className="text-sm text-gray-500">
-            {new Date(commit.createdAt).toLocaleDateString('pt-BR')}
+            {new Date(commit.authorDate).toLocaleDateString('pt-BR')}
           </div>
         </div>
       </div>
