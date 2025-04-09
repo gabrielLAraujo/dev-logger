@@ -38,7 +38,7 @@ npm install
 ```
 
 3. Configure as variáveis de ambiente:
-- Copie o arquivo `.env.example` para `.env`
+- Copie o arquivo `.env.example` para `.env.local`
 - Preencha as variáveis necessárias:
   - `DATABASE_URL`: URL de conexão com o PostgreSQL
   - `NEXTAUTH_URL`: URL da aplicação (ex: http://localhost:3000)
@@ -52,9 +52,54 @@ npx prisma generate
 npx prisma db push
 ```
 
-5. Inicie o servidor de desenvolvimento:
+## 🚀 Executando o Projeto
+
+### Ambiente de Desenvolvimento
+
+#### Usando os scripts automatizados:
+
+**No macOS/Linux:**
+```bash
+./dev.sh
+```
+
+**No Windows:**
+```bash
+dev.bat
+```
+
+#### Usando os comandos npm:
+
+**Desenvolvimento normal:**
 ```bash
 npm run dev
+```
+
+**Desenvolvimento com geração do Prisma Client:**
+```bash
+npm run dev:local
+```
+
+**Desenvolvimento com limpeza de cache:**
+```bash
+npm run dev:clean
+```
+
+**No Windows:**
+```bash
+npm run dev:clean:win
+```
+
+### Build e Produção
+
+Para criar uma build de produção:
+```bash
+npm run build
+```
+
+Para iniciar o servidor de produção:
+```bash
+npm run start
 ```
 
 ## 🔐 Configuração do GitHub OAuth
@@ -62,7 +107,7 @@ npm run dev
 1. Acesse [GitHub Developer Settings](https://github.com/settings/developers)
 2. Crie uma nova aplicação OAuth
 3. Configure a URL de callback: `http://localhost:3000/api/auth/callback/github`
-4. Copie o Client ID e Client Secret para o arquivo `.env`
+4. Copie o Client ID e Client Secret para o arquivo `.env.local`
 
 ## 📝 Licença
 

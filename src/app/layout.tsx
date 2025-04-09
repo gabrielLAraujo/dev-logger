@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import Navigation from '@/components/Navigation';
 import { ToastProvider } from '@/contexts/ToastContext';
 import ClientLayout from '@/components/ClientLayout';
+import Script from 'next/script';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,7 +22,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+      <head>
+        <link
+          rel="preload"
+          href="https://github.githubassets.com/assets/wp-runtime-8afca8541195.js"
+          as="script"
+          crossOrigin="anonymous"
+        />
+        <Script
+          src="https://github.githubassets.com/assets/wp-runtime-8afca8541195.js"
+          strategy="beforeInteractive"
+          crossOrigin="anonymous"
+        />
+      </head>
+      <body className={inter.className} suppressHydrationWarning data-turbo-suppress-warning>
         <SessionProvider>
           <ToastProvider>
             <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>

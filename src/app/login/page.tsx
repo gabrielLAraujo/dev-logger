@@ -14,14 +14,15 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated' && session) {
-      router.push('/dashboard');
+      router.push(callbackUrl);
     }
-  }, [status, session, router]);
+  }, [status, session, router, callbackUrl]);
 
   useEffect(() => {
     if (error) {
@@ -40,13 +41,23 @@ function LoginContent() {
     }
   }, [error]);
 
-  const handleGitHubLogin = () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    signIn('github', { 
-      callbackUrl: '/dashboard',
-      redirect: true
-    });
+  const handleGitHubLogin = async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+      const result = await signIn('github', { 
+        callbackUrl,
+        redirect: true
+      });
+
+      if (result?.error) {
+        setErrorMessage('Erro ao fazer login com o GitHub. Tente novamente.');
+        setIsLoading(false);
+      }
+    } catch (error) {
+      setErrorMessage('Ocorreu um erro inesperado. Tente novamente.');
+      setIsLoading(false);
+    }
   };
 
   if (status === 'loading') {
