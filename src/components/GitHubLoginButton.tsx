@@ -2,9 +2,12 @@
 
 import { signIn, signOut, useSession } from 'next-auth/react'
 import { FC } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 const GitHubLoginButton: FC = () => {
   const { data: session } = useSession()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
 
   if (session) {
     return (
@@ -23,7 +26,7 @@ const GitHubLoginButton: FC = () => {
 
   return (
     <button
-      onClick={() => signIn('github')}
+      onClick={() => signIn('github', { callbackUrl })}
       className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800"
     >
       <svg

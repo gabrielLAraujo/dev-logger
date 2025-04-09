@@ -18,25 +18,96 @@ interface Repository {
 export default function NewProjectForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [apiErrors, setApiErrors] = useState<Array<{ field: string; message: string }>>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [selectedRepos, setSelectedRepos] = useState<Repository[]>([]);
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: string;
+    description?: string;
+    repositories?: string;
+  }>({});
+  const [touchedFields, setTouchedFields] = useState<{
+    name: boolean;
+    description: boolean;
+  }>({
+    name: false,
+    description: false,
+  });
+
+  const validateField = (name: string, value: string) => {
+    if (name === 'name') {
+      if (!value || value.trim().length === 0) {
+        return 'O nome do projeto é obrigatório';
+      } else if (value.length > 100) {
+        return 'O nome do projeto não pode ter mais de 100 caracteres';
+      }
+    } else if (name === 'description' && value.length > 500) {
+      return 'A descrição não pode ter mais de 500 caracteres';
+    }
+    return '';
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setTouchedFields(prev => ({ ...prev, [name]: true }));
+    
+    const error = validateField(name, value);
+    setValidationErrors(prev => ({
+      ...prev,
+      [name]: error,
+    }));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    
+    if (touchedFields[name as keyof typeof touchedFields]) {
+      const error = validateField(name, value);
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: error,
+      }));
+    }
+  };
+
+  const validateForm = (formData: FormData) => {
+    const errors: { name?: string; description?: string; repositories?: string } = {};
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+
+    const nameError = validateField('name', name);
+    if (nameError) errors.name = nameError;
+
+    if (description) {
+      const descriptionError = validateField('description', description);
+      if (descriptionError) errors.description = descriptionError;
+    }
+
+    if (selectedRepos.length === 0) {
+      errors.repositories = 'Selecione pelo menos um repositório';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError(null);
+    setValidationErrors({});
 
-    if (selectedRepos.length === 0) {
-      setError('Selecione pelo menos um repositório');
+    const formData = new FormData(e.currentTarget);
+    
+    if (!validateForm(formData)) {
       setLoading(false);
       return;
     }
 
-    const formData = new FormData(e.currentTarget);
     const data = {
-      name: formData.get('name'),
-      description: formData.get('description'),
+      name: formData.get('name')?.toString().trim(),
+      description: formData.get('description')?.toString().trim() || null,
       repositories: selectedRepos.map(repo => repo.full_name),
     };
 
@@ -49,16 +120,26 @@ export default function NewProjectForm() {
         body: JSON.stringify(data),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao criar projeto');
+        if (result.details) {
+          setApiErrors(result.details);
+          setError(result.error || 'Erro ao criar projeto');
+        } else {
+          throw new Error(result.error || 'Erro ao criar projeto');
+        }
+        return;
       }
 
-      const project = await response.json();
-      setProjectId(project.id);
+      setProjectId(result.id);
       router.refresh();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro ao criar projeto');
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Ocorreu um erro inesperado ao criar o projeto');
+      }
     } finally {
       setLoading(false);
     }
@@ -86,7 +167,25 @@ export default function NewProjectForm() {
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
-            {error}
+            <p className="font-medium">Erro ao criar projeto</p>
+            <p className="text-sm">{error}</p>
+            {apiErrors.length > 0 && (
+              <ul className="mt-2 list-disc list-inside text-sm">
+                {apiErrors.map((err, index) => (
+                  <li key={index}>{err.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {(validationErrors.name || validationErrors.repositories) && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md mb-6">
+            <p className="font-medium">Por favor, corrija os seguintes erros:</p>
+            <ul className="list-disc list-inside text-sm mt-1">
+              {validationErrors.name && <li>{validationErrors.name}</li>}
+              {validationErrors.repositories && <li>{validationErrors.repositories}</li>}
+            </ul>
           </div>
         )}
 
@@ -104,8 +203,17 @@ export default function NewProjectForm() {
                     name="name"
                     required
                     placeholder="Digite o nome do projeto"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className={`w-full px-4 py-2 border ${
+                      validationErrors.name && touchedFields.name
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                    } rounded-md shadow-sm sm:text-sm`}
+                    onBlur={handleBlur}
+                    onChange={handleChange}
                   />
+                  {validationErrors.name && touchedFields.name && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
+                  )}
                 </div>
 
                 <div>
@@ -117,8 +225,17 @@ export default function NewProjectForm() {
                     name="description"
                     rows={4}
                     placeholder="Descreva o projeto (opcional)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className={`w-full px-4 py-2 border ${
+                      validationErrors.description && touchedFields.description
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                    } rounded-md shadow-sm sm:text-sm`}
+                    onBlur={handleBlur}
+                    onChange={handleChange}
                   />
+                  {validationErrors.description && touchedFields.description && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
+                  )}
                 </div>
               </div>
             </form>

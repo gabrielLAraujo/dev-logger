@@ -28,7 +28,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/auth/signin',
-    error: '/',
+    error: '/auth/signin',
   },
   callbacks: {
     async signIn({ user, account }) {
@@ -49,6 +49,7 @@ export const authOptions: NextAuthOptions = {
           });
         } catch (error) {
           console.error('Erro ao salvar token do GitHub:', error);
+          return false;
         }
       }
       return true;
@@ -60,11 +61,27 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Redireciona para o dashboard após o login
+      // Se a URL começar com o baseUrl, é uma URL interna
       if (url.startsWith(baseUrl)) {
+        // Se houver um callbackUrl na URL, use-o
+        const urlObj = new URL(url);
+        const callbackUrl = urlObj.searchParams.get('callbackUrl');
+        if (callbackUrl) {
+          // Verifica se o callbackUrl é uma URL interna
+          if (callbackUrl.startsWith(baseUrl) || callbackUrl.startsWith('/')) {
+            return callbackUrl;
+          }
+        }
+        // Se não houver callbackUrl, redireciona para o dashboard
         return `${baseUrl}/dashboard`;
       }
-      return url;
+      // Se a URL não começar com baseUrl, é uma URL externa
+      // Verifica se é uma URL permitida
+      if (url.startsWith('http://localhost:') || url.startsWith('https://')) {
+        return url;
+      }
+      // Se não for uma URL permitida, redireciona para o dashboard
+      return `${baseUrl}/dashboard`;
     },
   },
 } 
