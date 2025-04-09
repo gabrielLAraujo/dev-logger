@@ -3,12 +3,12 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import ProjectCard from '@/components/ProjectCard';
 import Link from 'next/link';
-import { authOptions } from '../api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 
 export default async function ProjectsPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.email) {
+  if (!session) {
     redirect('/');
   }
 
@@ -24,10 +24,10 @@ export default async function ProjectsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <div className="px-4 py-6 sm:px-0">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Meus Projetos</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Meus Projetos</h1>
           <Link
             href="/projects/new"
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
