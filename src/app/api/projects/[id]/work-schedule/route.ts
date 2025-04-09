@@ -2,6 +2,57 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { WorkSchedule } from '@/types/work-schedule';
+
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { message: 'Não autorizado' },
+        { status: 401 }
+      );
+    }
+
+    const projectId = params.id;
+
+    // Verifica se o projeto existe e pertence ao usuário
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        userId: session.user.id,
+      },
+    });
+
+    if (!project) {
+      return NextResponse.json(
+        { message: 'Projeto não encontrado' },
+        { status: 404 }
+      );
+    }
+
+    // Busca os horários do projeto
+    const schedules = await prisma.workSchedule.findMany({
+      where: {
+        projectId,
+      },
+      orderBy: {
+        dayOfWeek: 'asc',
+      },
+    });
+
+    return NextResponse.json(schedules);
+  } catch (error) {
+    console.error('Erro ao buscar grade de horários:', error);
+    return NextResponse.json(
+      { message: 'Erro ao buscar grade de horários' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(
   request: Request,
@@ -9,117 +60,54 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json(
+        { message: 'Não autorizado' },
+        { status: 401 }
+      );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
+    const projectId = params.id;
+    const { schedules } = await request.json() as { schedules: WorkSchedule[] };
 
-    if (!user) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-    }
-
+    // Verifica se o projeto existe e pertence ao usuário
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
-        userId: user.id,
+        id: projectId,
+        userId: session.user.id,
       },
     });
 
     if (!project) {
-      return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
-    }
-
-    const data = await request.json();
-    const { dayOfWeek, startTime, endTime, isWorkDay } = data;
-
-    if (typeof dayOfWeek !== 'number' || dayOfWeek < 0 || dayOfWeek > 6) {
       return NextResponse.json(
-        { error: 'Dia da semana inválido' },
-        { status: 400 }
+        { message: 'Projeto não encontrado' },
+        { status: 404 }
       );
     }
 
-    if (!startTime || !endTime) {
-      return NextResponse.json(
-        { error: 'Horário de início e término são obrigatórios' },
-        { status: 400 }
-      );
-    }
-
-    const workSchedule = await prisma.workSchedule.upsert({
+    // Deleta os horários existentes
+    await prisma.workSchedule.deleteMany({
       where: {
-        projectId_dayOfWeek: {
-          projectId: project.id,
-          dayOfWeek,
-        },
-      },
-      update: {
-        startTime,
-        endTime,
-        isWorkDay,
-      },
-      create: {
-        projectId: project.id,
-        dayOfWeek,
-        startTime,
-        endTime,
-        isWorkDay,
+        projectId,
       },
     });
 
-    return NextResponse.json(workSchedule);
+    // Cria os novos horários
+    const createdSchedules = await prisma.workSchedule.createMany({
+      data: schedules.map(schedule => ({
+        projectId,
+        dayOfWeek: schedule.dayOfWeek,
+        isWorkDay: schedule.isWorkDay,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+      })),
+    });
+
+    return NextResponse.json(createdSchedules);
   } catch (error) {
-    console.error('Erro ao salvar horário de trabalho:', error);
+    console.error('Erro ao salvar grade de horários:', error);
     return NextResponse.json(
-      { error: 'Erro ao salvar horário de trabalho' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    // Validar se o projeto pertence ao usuário
-    const project = await prisma.project.findUnique({
-      where: {
-        id: params.id,
-        user: {
-          email: session.user.email,
-        },
-      },
-    });
-
-    if (!project) {
-      return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
-    }
-
-    // Buscar todos os horários de trabalho do projeto
-    const workSchedules = await prisma.workSchedule.findMany({
-      where: {
-        projectId: params.id,
-      },
-      orderBy: {
-        dayOfWeek: 'asc',
-      },
-    });
-
-    return NextResponse.json(workSchedules);
-  } catch (error) {
-    console.error('Erro ao buscar horários de trabalho:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { message: 'Erro ao salvar grade de horários' },
       { status: 500 }
     );
   }

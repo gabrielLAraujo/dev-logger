@@ -143,7 +143,20 @@ export default function ProjectReport({ projectName, WorkSchedule, repositories,
   // Função para distribuir os commits entre os dias de trabalho
   const distributeCommits = () => {
     const workDays = daysOfMonth.filter(isWorkDay);
-    const allCommits = Object.values(commitsByDate).flat();
+    
+    // Filtrar commits apenas do mês atual
+    const currentMonthCommits = Object.entries(commitsByDate)
+      .filter(([date]) => {
+        const [day, month, year] = date.split('/');
+        const commitDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        return commitDate >= firstDayOfMonth && commitDate <= lastDayOfMonth;
+      })
+      .reduce((acc, [date, commits]) => {
+        acc[date] = commits;
+        return acc;
+      }, {} as Record<string, string[]>);
+
+    const allCommits = Object.values(currentMonthCommits).flat();
     const distributedCommits: Record<string, string[]> = {};
 
     // Inicializar todos os dias de trabalho com arrays vazios
