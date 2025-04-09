@@ -1,30 +1,16 @@
 # Dev Logger
 
-Uma aplicação web para rastrear automaticamente as atividades de desenvolvedores baseadas em commits do GitHub.
+Um aplicativo para rastrear suas atividades de desenvolvimento.
 
-## 🚀 Funcionalidades
+## Configuração
 
-- Login com GitHub
-- Dashboard protegido com dados do usuário
-- Configurações personalizadas
-- Monitoramento de commits
-- Integração futura com Google Sheets
+### Pré-requisitos
 
-## 🛠️ Tecnologias
+- Node.js 18.x ou superior
+- PostgreSQL 14.x ou superior
+- Conta no GitHub para autenticação OAuth
 
-- Next.js (App Router)
-- NextAuth.js
-- Prisma (PostgreSQL)
-- Tailwind CSS
-- TypeScript
-
-## 📋 Pré-requisitos
-
-- Node.js 18+
-- PostgreSQL
-- Conta no GitHub com acesso a OAuth
-
-## 🔧 Configuração
+### Instalação
 
 1. Clone o repositório:
 ```bash
@@ -38,77 +24,59 @@ npm install
 ```
 
 3. Configure as variáveis de ambiente:
-- Copie o arquivo `.env.example` para `.env.local`
-- Preencha as variáveis necessárias:
-  - `DATABASE_URL`: URL de conexão com o PostgreSQL
-  - `NEXTAUTH_URL`: URL da aplicação (ex: http://localhost:3000)
-  - `NEXTAUTH_SECRET`: Chave secreta para sessões
-  - `GITHUB_ID`: ID do OAuth do GitHub
-  - `GITHUB_SECRET`: Secret do OAuth do GitHub
+   - Copie o arquivo `.env.local` para `.env.local` e preencha as variáveis:
+     - `DATABASE_URL`: URL de conexão com o PostgreSQL
+     - `GITHUB_ID`: ID do cliente OAuth do GitHub
+     - `GITHUB_SECRET`: Segredo do cliente OAuth do GitHub
+     - `NEXTAUTH_SECRET`: Chave secreta para criptografia de sessão
+     - `NEXTAUTH_URL`: URL base da aplicação (http://localhost:3000 para desenvolvimento)
 
-4. Configure o banco de dados:
+4. Execute as migrações do banco de dados:
 ```bash
-npx prisma generate
-npx prisma db push
+npm run prisma:migrate
 ```
 
-## 🚀 Executando o Projeto
-
-### Ambiente de Desenvolvimento
-
-#### Usando os scripts automatizados:
-
-**No macOS/Linux:**
+5. Gere o cliente Prisma:
 ```bash
-./dev.sh
+npm run prisma:generate
 ```
 
-**No Windows:**
-```bash
-dev.bat
-```
+## Executando o projeto
 
-#### Usando os comandos npm:
+### Desenvolvimento
 
-**Desenvolvimento normal:**
 ```bash
 npm run dev
 ```
 
-**Desenvolvimento com geração do Prisma Client:**
+O aplicativo estará disponível em http://localhost:3000
+
+### Produção
+
 ```bash
-npm run dev:local
+npm run deploy:prod
 ```
 
-**Desenvolvimento com limpeza de cache:**
-```bash
-npm run dev:clean
-```
+Este comando irá:
+1. Gerar o cliente Prisma
+2. Executar as migrações do banco de dados
+3. Construir o aplicativo
+4. Iniciar o servidor de produção
 
-**No Windows:**
-```bash
-npm run dev:clean:win
-```
+## Scripts disponíveis
 
-### Build e Produção
+- `npm run dev`: Inicia o servidor de desenvolvimento
+- `npm run build`: Constrói o aplicativo para produção
+- `npm run start`: Inicia o servidor de produção
+- `npm run lint`: Executa o linter
+- `npm run prisma:generate`: Gera o cliente Prisma
+- `npm run prisma:migrate`: Executa as migrações do banco de dados
+- `npm run prisma:studio`: Abre o Prisma Studio para gerenciar o banco de dados
+- `npm run deploy:prod`: Executa o processo completo de implantação em produção
 
-Para criar uma build de produção:
-```bash
-npm run build
-```
+## Estrutura do projeto
 
-Para iniciar o servidor de produção:
-```bash
-npm run start
-```
-
-## 🔐 Configuração do GitHub OAuth
-
-1. Acesse [GitHub Developer Settings](https://github.com/settings/developers)
-2. Crie uma nova aplicação OAuth
-3. Configure a URL de callback: `http://localhost:3000/api/auth/callback/github`
-4. Copie o Client ID e Client Secret para o arquivo `.env.local`
-
-## 📝 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+- `/src/app`: Componentes e páginas da aplicação Next.js
+- `/src/components`: Componentes reutilizáveis
+- `/prisma`: Configuração e migrações do Prisma
+- `/public`: Arquivos estáticos 
