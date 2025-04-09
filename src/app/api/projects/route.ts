@@ -3,32 +3,50 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
+    if (!session?.user?.email) {
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 401 }
       );
     }
 
-    const data = await request.json();
-    const { name, description } = data;
+    const { name, description, repositories } = await req.json();
 
-    if (!name) {
+    if (!name || !repositories || repositories.length === 0) {
       return NextResponse.json(
-        { error: 'Nome do projeto é obrigatório' },
+        { error: 'Nome e pelo menos um repositório são obrigatórios' },
         { status: 400 }
       );
     }
 
+    // Busca o usuário pelo email
+    const user = await prisma.user.findUnique({
+      where: {
+        email: session.user.email,
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Usuário não encontrado' },
+        { status: 404 }
+      );
+    }
+
+    // Cria o projeto
     const project = await prisma.project.create({
       data: {
         name,
         description,
-        userId: session.user.id,
+        repositories,
+        userId: user.id,
+      },
+      include: {
+        WorkSchedule: true,
       },
     });
 
@@ -46,7 +64,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
+    if (!session?.user?.email) {
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 401 }
@@ -55,10 +73,15 @@ export async function GET() {
 
     const projects = await prisma.project.findMany({
       where: {
-        userId: session.user.id,
+        user: {
+          email: session.user.email,
+        },
       },
       orderBy: {
         createdAt: 'desc',
+      },
+      include: {
+        WorkSchedule: true,
       },
     });
 

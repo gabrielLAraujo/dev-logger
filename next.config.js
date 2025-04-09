@@ -13,6 +13,10 @@ const nextConfig = {
       ...config.resolve.fallback,
       fs: false,
     };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, 'src'),
+    };
     return config;
   },
 }

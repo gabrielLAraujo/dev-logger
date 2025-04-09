@@ -2,8 +2,9 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { PrismaClient } from "@prisma/client"
 import { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
+import { prisma } from './prisma'
 
-const prisma = new PrismaClient()
+const prismaClient = new PrismaClient()
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -11,6 +12,11 @@ export const authOptions: NextAuthOptions = {
     GithubProvider({
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
+      authorization: {
+        params: {
+          scope: 'read:user repo',
+        },
+      },
     }),
   ],
   session: {
@@ -21,12 +27,34 @@ export const authOptions: NextAuthOptions = {
     secret: process.env.NEXTAUTH_SECRET,
   },
   pages: {
-    signIn: '/',
+    signIn: '/auth/signin',
     error: '/',
   },
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === 'github' && account.access_token) {
+        try {
+          // Salva o token do GitHub nas configurações do usuário
+          await prisma.userSettings.upsert({
+            where: {
+              userEmail: user.email!,
+            },
+            update: {
+              githubToken: account.access_token,
+            },
+            create: {
+              userEmail: user.email!,
+              githubToken: account.access_token,
+            },
+          });
+        } catch (error) {
+          console.error('Erro ao salvar token do GitHub:', error);
+        }
+      }
+      return true;
+    },
     async session({ session, token }) {
-      if (session.user) {
+      if (session?.user) {
         session.user.id = token.sub as string;
       }
       return session;

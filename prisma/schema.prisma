@@ -41,10 +41,9 @@ model User {
   image         String?
   password      String?
   accounts      Account[]
-  Commit        Commit[]
   Project       Project[]
   sessions      Session[]
-  UserSettings  UserSettings?
+  settings      UserSettings?
 }
 
 model VerificationToken {
@@ -53,19 +52,6 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
-}
-
-model Commit {
-  id         String   @id @default(cuid())
-  hash       String
-  message    String
-  repository String
-  createdAt  DateTime @default(now())
-  userId     String
-  url        String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([hash, repository])
 }
 
 model Log {
@@ -93,14 +79,12 @@ model Project {
 }
 
 model UserSettings {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  workStartTime     String   @default("09:00")
-  workEndTime       String   @default("18:00")
-  workDays          String[] @default(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"])
-  monitoredRepos    String[] @default([])
-  githubAccessToken String?
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userEmail  String   @unique
+  githubToken String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
 }
 
 model WorkSchedule {

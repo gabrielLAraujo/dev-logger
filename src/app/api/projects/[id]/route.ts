@@ -4,82 +4,87 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
-  request: Request,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      );
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     const project = await prisma.project.findUnique({
       where: {
         id: params.id,
-        userId: session.user.id,
+        user: {
+          email: session.user.email,
+        },
       },
       include: {
-        logs: {
+        WorkSchedule: true,
+        commits: {
           orderBy: {
             createdAt: 'desc',
           },
+          take: 10,
         },
       },
     });
 
     if (!project) {
-      return NextResponse.json(
-        { error: 'Projeto não encontrado' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
     }
 
     return NextResponse.json(project);
   } catch (error) {
     console.error('Erro ao buscar projeto:', error);
     return NextResponse.json(
-      { error: 'Erro ao buscar projeto' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
 }
 
 export async function PUT(
-  request: Request,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      );
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const data = await request.json();
-    const { name, description } = data;
+    const { name, description, repositories } = await req.json();
 
     if (!name) {
-      return NextResponse.json(
-        { error: 'Nome do projeto é obrigatório' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });
+    }
+
+    // Validar se o projeto pertence ao usuário
+    const existingProject = await prisma.project.findUnique({
+      where: {
+        id: params.id,
+        user: {
+          email: session.user.email,
+        },
+      },
+    });
+
+    if (!existingProject) {
+      return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
     }
 
     const project = await prisma.project.update({
       where: {
         id: params.id,
-        userId: session.user.id,
       },
       data: {
         name,
         description,
+        repositories: repositories || [],
       },
     });
 
@@ -87,38 +92,49 @@ export async function PUT(
   } catch (error) {
     console.error('Erro ao atualizar projeto:', error);
     return NextResponse.json(
-      { error: 'Erro ao atualizar projeto' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: Request,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      );
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    await prisma.project.delete({
+    // Validar se o projeto pertence ao usuário
+    const project = await prisma.project.findUnique({
       where: {
         id: params.id,
-        userId: session.user.id,
+        user: {
+          email: session.user.email,
+        },
       },
     });
 
-    return NextResponse.json({ success: true });
+    if (!project) {
+      return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
+    }
+
+    // Deletar o projeto (as relações serão deletadas automaticamente devido ao onDelete: Cascade)
+    await prisma.project.delete({
+      where: {
+        id: params.id,
+      },
+    });
+
+    return NextResponse.json({ message: 'Projeto deletado com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar projeto:', error);
     return NextResponse.json(
-      { error: 'Erro ao deletar projeto' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
