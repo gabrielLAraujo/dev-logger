@@ -129,15 +129,6 @@ export function useWorkSchedule({ projectId, initialSchedules = [], onSuccess }:
         throw new Error(error.message || 'Erro ao salvar horários de trabalho');
       }
 
-      // Atualiza o estado local com os horários retornados da API
-      const savedSchedules = await response.json();
-      setSchedulesByDay(savedSchedules.map((schedule: WorkSchedule) => ({
-        dayOfWeek: schedule.dayOfWeek,
-        isWorkDay: schedule.isWorkDay,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-      })));
-
       onSuccess?.();
       router.refresh();
       toast.success('Horários de trabalho salvos com sucesso!');
