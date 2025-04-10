@@ -97,9 +97,9 @@ export async function POST(
       data: schedules.map(schedule => ({
         projectId,
         dayOfWeek: schedule.dayOfWeek,
-        isWorkDay: schedule.isWorkDay,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
+        isWorkDay: schedule.isWorkDay ?? true,
+        startTime: schedule.startTime || '09:00',
+        endTime: schedule.endTime || '18:00',
       })),
     });
 

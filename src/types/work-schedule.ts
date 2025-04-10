@@ -11,10 +11,12 @@ export const DAY_NAMES: Record<DayOfWeek, string> = {
 };
 
 export interface WorkSchedule {
-  id: string;
-  projectId: string;
+  id?: string;
+  projectId?: string;
   dayOfWeek: DayOfWeek;
   isWorkDay: boolean;
   startTime: string;
   endTime: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 } 

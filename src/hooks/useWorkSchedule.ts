@@ -110,7 +110,7 @@ export function useWorkSchedule({ projectId, initialSchedules = [], onSuccess }:
       // Garantir que todos os campos necessários estejam presentes
       const schedulesToSave = schedulesByDay.map(schedule => ({
         dayOfWeek: schedule.dayOfWeek,
-        isWorkDay: schedule.isWorkDay,
+        isWorkDay: schedule.isWorkDay ?? true,
         startTime: schedule.startTime || '09:00',
         endTime: schedule.endTime || '18:00',
       }));
