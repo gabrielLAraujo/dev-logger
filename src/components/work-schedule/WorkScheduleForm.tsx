@@ -1,23 +1,26 @@
 import { useState } from 'react';
-import { WorkSchedule, DayOfWeek, DAY_NAMES } from '@/types/work-schedule';
-import { WorkScheduleRow } from './WorkScheduleRow';
+import { DayOfWeek, DAY_NAMES } from '@/types/work-schedule';
+import WorkScheduleRow from './WorkScheduleRow';
+import { WorkSchedule as PrismaWorkSchedule } from '@prisma/client';
 
 interface WorkScheduleFormProps {
   projectId: string;
-  initialSchedules?: WorkSchedule[];
+  initialSchedules?: PrismaWorkSchedule[];
   onSave?: () => void;
 }
 
 export function WorkScheduleForm({ projectId, initialSchedules = [], onSave }: WorkScheduleFormProps) {
-  const [schedules, setSchedules] = useState<WorkSchedule[]>(() => {
+  const [schedules, setSchedules] = useState<PrismaWorkSchedule[]>(() => {
     // Inicializa a grade com todos os dias da semana
-    const defaultSchedules: WorkSchedule[] = Array.from({ length: 7 }, (_, index) => ({
+    const defaultSchedules: PrismaWorkSchedule[] = Array.from({ length: 7 }, (_, index) => ({
       id: '',
       projectId,
       dayOfWeek: index as DayOfWeek,
       isWorkDay: false,
       startTime: '09:00',
       endTime: '18:00',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }));
 
     // Atualiza com os horários existentes
@@ -31,7 +34,7 @@ export function WorkScheduleForm({ projectId, initialSchedules = [], onSave }: W
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleScheduleChange = (updatedSchedule: WorkSchedule) => {
+  const handleScheduleChange = (updatedSchedule: PrismaWorkSchedule) => {
     setSchedules(prev => 
       prev.map(schedule => 
         schedule.dayOfWeek === updatedSchedule.dayOfWeek ? updatedSchedule : schedule
@@ -95,9 +98,16 @@ export function WorkScheduleForm({ projectId, initialSchedules = [], onSave }: W
             {schedules.map((schedule) => (
               <WorkScheduleRow
                 key={schedule.dayOfWeek}
+                day={schedule.dayOfWeek as DayOfWeek}
                 schedule={schedule}
-                dayName={DAY_NAMES[schedule.dayOfWeek]}
-                onChange={handleScheduleChange}
+                onWorkDayChange={(day, isWorkDay) => {
+                  const updatedSchedule = { ...schedule, isWorkDay };
+                  handleScheduleChange(updatedSchedule);
+                }}
+                onTimeChange={(day, field, value) => {
+                  const updatedSchedule = { ...schedule, [field]: value };
+                  handleScheduleChange(updatedSchedule);
+                }}
               />
             ))}
           </tbody>
