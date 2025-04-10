@@ -27,7 +27,7 @@ npm install
      - `GITHUB_SECRET`: Segredo do cliente OAuth do GitHub
      - `DATABASE_URL`: URL de conexão com o banco de dados PostgreSQL
      - `NEXT_PUBLIC_APP_URL`: URL pública da aplicação
-     - `NEXT_PUBLIC_HUGGINGFACE_TOKEN`: Token para acessar a API do Hugging Face (opcional, para melhorar mensagens de commit)
+     - `HUGGINGFACE_TOKEN`: Token para acessar a API do Hugging Face (opcional, para melhorar mensagens de commit)
 
 4. Configure o banco de dados:
 ```bash
@@ -57,7 +57,7 @@ Para usar a funcionalidade de melhorar mensagens de commit:
 1. Crie uma conta no [Hugging Face](https://huggingface.co/)
 2. Acesse [Access Tokens](https://huggingface.co/settings/tokens)
 3. Crie um novo token com permissões de leitura
-4. Copie o token para o arquivo `.env` como `NEXT_PUBLIC_HUGGINGFACE_TOKEN`
+4. Copie o token para o arquivo `.env` como `HUGGINGFACE_TOKEN`
 
 ## Funcionalidades
 
