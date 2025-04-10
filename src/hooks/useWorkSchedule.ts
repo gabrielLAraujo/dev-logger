@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { WorkSchedule } from '@prisma/client';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface UseWorkScheduleProps {
   projectId: string;
@@ -54,6 +55,7 @@ export function useWorkSchedule({ projectId, initialSchedules = [], onSuccess }:
     const firstSchedule = schedulesByDay[1]; // Começa do índice 1 (Segunda-feira)
     if (!firstSchedule.isWorkDay) {
       setError('Selecione pelo menos um dia útil primeiro.');
+      toast.error('Selecione pelo menos um dia útil primeiro.');
       return;
     }
 
@@ -62,11 +64,13 @@ export function useWorkSchedule({ projectId, initialSchedules = [], onSuccess }:
 
     if (!startTime || !endTime) {
       setError('Defina os horários do primeiro dia útil primeiro.');
+      toast.error('Defina os horários do primeiro dia útil primeiro.');
       return;
     }
 
     if (startTime >= endTime) {
       setError('O horário de início deve ser menor que o horário de término.');
+      toast.error('O horário de início deve ser menor que o horário de término.');
       return;
     }
 
@@ -86,51 +90,61 @@ export function useWorkSchedule({ projectId, initialSchedules = [], onSuccess }:
     setLoading(true);
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
-    const schedules = Array.from({ length: 7 }, (_, index) => ({
-      dayOfWeek: index,
-      startTime: formData.get(`startTime-${index}`) as string,
-      endTime: formData.get(`endTime-${index}`) as string,
-      isWorkDay: formData.has(`isWorkDay-${index}`),
-    }));
-
     try {
-      // Validar horários
-      const invalidSchedules = schedules.filter(schedule => {
+      // Validar horários usando o estado atual
+      const invalidSchedules = schedulesByDay.filter(schedule => {
         if (!schedule.isWorkDay) return false;
-        const startTime = (document.getElementById(`startTime-${schedule.dayOfWeek}`) as HTMLInputElement).value;
-        const endTime = (document.getElementById(`endTime-${schedule.dayOfWeek}`) as HTMLInputElement).value;
-        return startTime >= endTime;
+        return schedule.startTime >= schedule.endTime;
       });
 
       if (invalidSchedules.length > 0) {
-        setError('O horário de início deve ser menor que o horário de término em todos os dias úteis.');
+        const errorMessage = 'O horário de início deve ser menor que o horário de término em todos os dias úteis.';
+        setError(errorMessage);
+        toast.error(errorMessage);
         setLoading(false);
         return;
       }
 
-      // Criar os novos horários
-      const results = await Promise.all(
-        schedules.map((schedule) =>
-          fetch(`/api/projects/${projectId}/work-schedule`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(schedule),
-          }).then(res => {
-            if (!res.ok) {
-              throw new Error(`Erro ao salvar horário para o dia ${schedule.dayOfWeek}`);
-            }
-            return res.json();
-          })
-        )
-      );
+      toast.loading('Salvando horários de trabalho...');
+      
+      // Garantir que todos os campos necessários estejam presentes
+      const schedulesToSave = schedulesByDay.map(schedule => ({
+        dayOfWeek: schedule.dayOfWeek,
+        isWorkDay: schedule.isWorkDay,
+        startTime: schedule.startTime || '09:00',
+        endTime: schedule.endTime || '18:00',
+      }));
+      
+      // Enviar todos os horários de uma vez
+      const response = await fetch(`/api/projects/${projectId}/work-schedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ schedules: schedulesToSave }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Erro ao salvar horários de trabalho');
+      }
+
+      // Atualiza o estado local com os horários retornados da API
+      const savedSchedules = await response.json();
+      setSchedulesByDay(savedSchedules.map((schedule: WorkSchedule) => ({
+        dayOfWeek: schedule.dayOfWeek,
+        isWorkDay: schedule.isWorkDay,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+      })));
 
       onSuccess?.();
       router.refresh();
+      toast.success('Horários de trabalho salvos com sucesso!');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro ao salvar horários de trabalho');
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar horários de trabalho';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

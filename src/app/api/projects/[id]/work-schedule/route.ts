@@ -93,7 +93,7 @@ export async function POST(
     });
 
     // Cria os novos horários
-    const createdSchedules = await prisma.workSchedule.createMany({
+    await prisma.workSchedule.createMany({
       data: schedules.map(schedule => ({
         projectId,
         dayOfWeek: schedule.dayOfWeek,
@@ -101,6 +101,16 @@ export async function POST(
         startTime: schedule.startTime,
         endTime: schedule.endTime,
       })),
+    });
+
+    // Busca os horários criados para retornar
+    const createdSchedules = await prisma.workSchedule.findMany({
+      where: {
+        projectId,
+      },
+      orderBy: {
+        dayOfWeek: 'asc',
+      },
     });
 
     return NextResponse.json(createdSchedules);

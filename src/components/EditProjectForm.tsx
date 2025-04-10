@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkScheduleForm from './WorkScheduleForm';
 import { Project, WorkSchedule } from '@prisma/client';
+import { toast } from 'sonner';
 
 interface EditProjectFormProps {
   project: Project & {
@@ -29,6 +30,7 @@ export default function EditProjectForm({ project }: EditProjectFormProps) {
     };
 
     try {
+      toast.loading('Atualizando projeto...');
       const response = await fetch(`/api/projects/${project.id}`, {
         method: 'PUT',
         headers: {
@@ -39,13 +41,17 @@ export default function EditProjectForm({ project }: EditProjectFormProps) {
 
       if (!response.ok) {
         const error = await response.json();
+        toast.error(error.error || 'Erro ao atualizar projeto');
         throw new Error(error.error || 'Erro ao atualizar projeto');
       }
 
       router.push(`/projects/${project.id}`);
       router.refresh();
+      toast.success('Projeto atualizado com sucesso!');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro ao atualizar projeto');
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao atualizar projeto';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

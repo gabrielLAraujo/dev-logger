@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import WorkScheduleForm from './WorkScheduleForm';
 import DeleteProjectModal from './DeleteProjectModal';
 
@@ -38,6 +39,7 @@ export default function ProjectDetails({ project }: ProjectDetailsProps) {
     setError('');
 
     try {
+      toast.loading('Sincronizando commits...');
       const response = await fetch(`/api/projects/${project.id}/sync-commits`, {
         method: 'POST',
       });
@@ -49,9 +51,12 @@ export default function ProjectDetails({ project }: ProjectDetailsProps) {
       
       // Após sincronizar, buscar os commits atualizados
       await fetchCommits();
+      toast.success('Commits sincronizados com sucesso!');
     } catch (error) {
       console.error('Erro ao sincronizar commits:', error);
-      setError(error instanceof Error ? error.message : 'Erro ao sincronizar commits');
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao sincronizar commits';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSyncing(false);
     }
@@ -75,7 +80,9 @@ export default function ProjectDetails({ project }: ProjectDetailsProps) {
       setCommits(data);
     } catch (error) {
       console.error('Erro ao buscar commits:', error);
-      setError(error instanceof Error ? error.message : 'Erro ao buscar commits');
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao buscar commits';
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -91,6 +98,7 @@ export default function ProjectDetails({ project }: ProjectDetailsProps) {
     setError('');
 
     try {
+      toast.loading('Excluindo projeto...');
       const response = await fetch(`/api/projects/${project.id}`, {
         method: 'DELETE',
       });
@@ -102,8 +110,11 @@ export default function ProjectDetails({ project }: ProjectDetailsProps) {
 
       router.push('/projects');
       router.refresh();
+      toast.success('Projeto excluído com sucesso!');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro ao excluir projeto');
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao excluir projeto';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
       setIsDeleteModalOpen(false);

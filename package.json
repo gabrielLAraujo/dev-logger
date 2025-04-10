@@ -33,6 +33,7 @@
     "next-auth": "^4.24.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.5.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
     "xlsx": "^0.18.5",

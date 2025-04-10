@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkScheduleForm from './WorkScheduleForm';
 import RepositoryList from './RepositoryList';
+import { toast } from 'sonner';
 
 interface Repository {
   id: number;
@@ -89,29 +90,39 @@ export default function NewProjectForm() {
     }
 
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return {
+      success: Object.keys(errors).length === 0,
+      data: {
+        name: name.trim(),
+        description: description ? description.trim() : null,
+        repositories: selectedRepos.map(repo => repo.full_name),
+      },
+      errors: Object.keys(errors).map(field => ({
+        field,
+        message: errors[field as keyof typeof errors] || '',
+      })),
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    setValidationErrors({});
+    setError('');
+    setApiErrors([]);
 
     const formData = new FormData(e.currentTarget);
-    
-    if (!validateForm(formData)) {
+    const validationResult = validateForm(formData);
+
+    if (!validationResult.success) {
+      setApiErrors(validationResult.errors);
       setLoading(false);
       return;
     }
 
-    const data = {
-      name: formData.get('name')?.toString().trim(),
-      description: formData.get('description')?.toString().trim() || null,
-      repositories: selectedRepos.map(repo => repo.full_name),
-    };
+    const data = validationResult.data;
 
     try {
+      toast.loading('Criando projeto...');
       const response = await fetch('/api/projects', {
         method: 'POST',
         headers: {
@@ -126,6 +137,7 @@ export default function NewProjectForm() {
         if (result.details) {
           setApiErrors(result.details);
           setError(result.error || 'Erro ao criar projeto');
+          toast.error(result.error || 'Erro ao criar projeto');
         } else {
           throw new Error(result.error || 'Erro ao criar projeto');
         }
@@ -134,11 +146,14 @@ export default function NewProjectForm() {
 
       setProjectId(result.id);
       router.refresh();
+      toast.success('Projeto criado com sucesso!');
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message);
+        toast.error(error.message);
       } else {
         setError('Ocorreu um erro inesperado ao criar o projeto');
+        toast.error('Ocorreu um erro inesperado ao criar o projeto');
       }
     } finally {
       setLoading(false);
