@@ -59,7 +59,7 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
 
       <ProjectReport 
         projectName={project.name}
-        WorkSchedule={project.WorkSchedule}
+        workSchedule={project.WorkSchedule}
         repositories={project.repositories}
         projectId={project.id}
       />

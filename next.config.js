@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
-    forceSwcTransforms: true // Força o uso do SWC
+    forceSwcTransforms: true
   },
   images: {
     domains: ['avatars.githubusercontent.com'],

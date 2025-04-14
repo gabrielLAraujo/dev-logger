@@ -33,7 +33,7 @@ export default async function ReportsPage() {
           <ProjectReport
             key={project.id}
             projectName={project.name}
-            WorkSchedule={project.WorkSchedule}
+            workSchedule={project.WorkSchedule}
             repositories={project.repositories}
             projectId={project.id}
           />

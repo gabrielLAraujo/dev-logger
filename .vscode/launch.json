@@ -77,6 +77,12 @@
       "env": {
         "DEBUG": "prisma:*"
       }
+    },
+    {
+      "name": "Next.js: debug server-side",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run debug"
     }
   ]
 } 

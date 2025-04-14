@@ -21,21 +21,34 @@ interface RepositoryListProps {
   onSelect?: (repositories: Repository[]) => void;
   selectedRepos?: string[];
   multiple?: boolean;
+  organization?: string;
 }
 
-export default function RepositoryList({ onSelect, selectedRepos = [], multiple = false }: RepositoryListProps) {
+export default function RepositoryList({ onSelect, selectedRepos = [], multiple = false, organization }: RepositoryListProps) {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set(selectedRepos));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const { data: session } = useSession();
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    
     const fetchRepositories = async () => {
       try {
-        const response = await fetch('/api/github/repositories');
+        // Construir a URL com o parâmetro de organização, se fornecido
+        const url = organization 
+          ? `/api/github/repositories?organization=${encodeURIComponent(organization)}`
+          : '/api/github/repositories';
+        
+        const response = await fetch(url);
         if (!response.ok) {
           const data = await response.json();
           if (response.status === 401) {
@@ -57,7 +70,7 @@ export default function RepositoryList({ onSelect, selectedRepos = [], multiple 
     if (session) {
       fetchRepositories();
     }
-  }, [session, router]);
+  }, [session, router, organization, mounted]);
 
   const handleSelect = (repo: Repository) => {
     const newSelected = new Set(selected);
@@ -81,6 +94,14 @@ export default function RepositoryList({ onSelect, selectedRepos = [], multiple 
     repo.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     repo.full_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (!mounted) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

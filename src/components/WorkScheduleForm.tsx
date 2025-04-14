@@ -1,7 +1,7 @@
 'use client';
 
 import { WorkSchedule } from '@prisma/client';
-import Button from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import Alert from '@/components/ui/Alert';
 import WorkScheduleHeader from '@/components/work-schedule/WorkScheduleHeader';
 import WorkScheduleGrid from '@/components/work-schedule/WorkScheduleGrid';
@@ -50,8 +50,8 @@ export default function WorkScheduleForm({ projectId, initialSchedules = [], onS
         <div className="mt-6 flex justify-end">
           <Button
             type="submit"
-            variant="primary"
-            isLoading={loading}
+            variant="default"
+            disabled={loading}
           >
             {loading ? 'Salvando...' : 'Salvar horários'}
           </Button>

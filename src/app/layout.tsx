@@ -1,11 +1,8 @@
 import './globals.css';
-import { Inter } from 'next/font/google';
 import { getServerSession } from 'next-auth';
 import Header from '@/components/Header';
 import { AuthProvider } from './providers';
 import { authOptions } from '@/lib/auth';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
   title: 'Dev Logger',
@@ -21,7 +18,7 @@ export default async function RootLayout({
 
   return (
     <html lang="pt-BR">
-      <body className={inter.className}>
+      <body className="font-sans">
         <AuthProvider>
           <div className="min-h-screen bg-gray-50">
             <Header />

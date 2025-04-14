@@ -42,6 +42,10 @@ export default function ProjectDetails({ project }: ProjectDetailsProps) {
       toast.loading('Sincronizando commits...');
       const response = await fetch(`/api/projects/${project.id}/sync-commits`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
       });
       
       if (!response.ok) {
@@ -66,7 +70,12 @@ export default function ProjectDetails({ project }: ProjectDetailsProps) {
     setError('');
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/commits`);
+      const response = await fetch(`/api/projects/${project.id}/commits`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
       const data = await response.json();
       
       if (!response.ok) {

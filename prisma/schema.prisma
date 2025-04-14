@@ -80,19 +80,40 @@ model Commit {
   @@unique([sha, projectId], name: "sha_projectId")
 }
 
+enum Status {
+  pendente
+  em_andamento
+  concluido
+}
+
+model DailyActivity {
+  id          String   @id @default(cuid())
+  description String
+  date        DateTime
+  status      Status   @default(pendente)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+}
+
 model Project {
-  id           String         @id @default(cuid())
-  name         String
-  description  String?
-  status       String         @default("active")
-  userId       String
-  repositories String[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  WorkSchedule WorkSchedule[]
-  logs         Log[]
-  commits      Commit[]
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  status         String          @default("active")
+  userId         String
+  repositories   String[]
+  organization   String?
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  WorkSchedule   WorkSchedule[]
+  logs           Log[]
+  commits        Commit[]
+  dailyActivities DailyActivity[]
 }
 
 model UserSettings {

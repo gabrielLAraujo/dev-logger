@@ -93,30 +93,43 @@ export async function POST(req: Request) {
 
     const invalidRepos = [];
     for (const repo of repositories) {
-      const [owner, repoName] = repo.split('/');
-      const response = await fetch(
-        `https://api.github.com/repos/${owner}/${repoName}`,
-        {
+      try {
+        // Validar formato do repositório
+        if (!repo.includes('/')) {
+          invalidRepos.push(`${repo} (formato inválido, deve ser 'owner/repo')`);
+          continue;
+        }
+
+        const [owner, repoName] = repo.split('/');
+        if (!owner || !repoName) {
+          invalidRepos.push(`${repo} (formato inválido, deve ser 'owner/repo')`);
+          continue;
+        }
+
+        // Verificar se o repositório existe e o usuário tem acesso
+        const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}`, {
           headers: {
             Authorization: `Bearer ${userSettings.githubToken}`,
             Accept: 'application/vnd.github.v3+json',
           },
-        }
-      );
+        });
 
-      if (!response.ok) {
-        invalidRepos.push(repo);
+        if (!repoResponse.ok) {
+          const errorData = await repoResponse.json();
+          console.error(`Erro ao verificar repositório ${repo}:`, errorData);
+          invalidRepos.push(`${repo} (${errorData.message || 'repositório não encontrado ou sem acesso'})`);
+        }
+      } catch (error) {
+        console.error(`Erro ao verificar repositório ${repo}:`, error);
+        invalidRepos.push(`${repo} (erro ao verificar acesso)`);
       }
     }
 
     if (invalidRepos.length > 0) {
       return NextResponse.json(
         { 
-          error: 'Repositórios inválidos ou inacessíveis',
-          details: invalidRepos.map(repo => ({
-            field: 'repositories',
-            message: `O repositório ${repo} não existe ou você não tem acesso a ele`,
-          })),
+          error: 'Repositórios inválidos ou inacessíveis', 
+          details: invalidRepos 
         },
         { status: 400 }
       );

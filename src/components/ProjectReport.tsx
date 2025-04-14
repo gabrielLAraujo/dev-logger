@@ -1,492 +1,651 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, isAfter, isBefore, parseISO } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isWithinInterval, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import ExportButton from './ExportButton';
-import { improveCommitMessage } from '@/lib/huggingface';
 import { toast } from 'react-hot-toast';
+import ActivityTable from './ActivityTable';
+import ActivityKanban from './ActivityKanban';
+import type { WorkSchedule } from '@prisma/client';
+import type { DailyActivity as PrismaDailyActivity } from '@prisma/client';
+
+type Status = 'pendente' | 'em_andamento' | 'concluido';
+
+interface DailyActivity {
+  id: string;
+  description: string;
+  date: string;
+  status: Status;
+  projectId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface DailyActivityState {
+  id: string;
+  description: string;
+  date: string;
+  status: Status;
+}
 
 interface GitHubCommit {
   sha: string;
   commit: {
     message: string;
     author: {
-      date: string;
       name: string;
+      date: string;
     };
   };
   html_url: string;
 }
 
-interface WorkSchedule {
-  id: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  isWorkDay: boolean;
+interface Commit {
+  sha: string;
+  message: string;
+  author: string;
+  date: string;
+  url: string;
 }
 
 interface ProjectReportProps {
   projectName: string;
-  WorkSchedule: WorkSchedule[];
+  workSchedule: WorkSchedule[];
   repositories: string[];
   projectId: string;
+  startDate: string;
+  endDate: string;
 }
 
-export default function ProjectReport({ projectName, WorkSchedule, repositories, projectId }: ProjectReportProps) {
-  const [spreadCommits, setSpreadCommits] = useState(false);
-  const [improveCommitMessages, setImproveCommitMessages] = useState(false);
-  const [commits, setCommits] = useState<GitHubCommit[]>([]);
+interface DailyActivityResponse {
+  id: string;
+  description: string;
+  date: string;
+  status: Status;
+}
+
+export default function ProjectReport({ projectName, workSchedule, repositories, projectId }: Omit<ProjectReportProps, 'startDate' | 'endDate'>) {
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [commits, setCommits] = useState<{ [key: string]: Commit[] }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isImprovingMessages, setIsImprovingMessages] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [dailyActivities, setDailyActivities] = useState<DailyActivityState[]>([]);
+  const [hasGitHubToken, setHasGitHubToken] = useState<boolean | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [shouldSpreadCommits, setShouldSpreadCommits] = useState(false);
 
-  const fetchCommitsFromGitHub = async () => {
-    setIsLoading(true);
-    setError(null);
+  const startDate = startOfMonth(selectedMonth).toISOString();
+  const endDate = endOfMonth(selectedMonth).toISOString();
 
+  const handlePreviousMonth = () => {
+    setSelectedMonth(prev => subMonths(prev, 1));
+  };
+
+  const handleNextMonth = () => {
+    setSelectedMonth(prev => addMonths(prev, 1));
+  };
+
+  const isWorkDay = (date: Date): boolean => {
+    return workSchedule.some(schedule => {
+      const startTime = new Date(`1970-01-01T${schedule.startTime}`);
+      const endTime = new Date(`1970-01-01T${schedule.endTime}`);
+      
+      return schedule.isWorkDay && 
+             schedule.dayOfWeek === date.getDay() &&
+             startTime <= endTime;
+    });
+  };
+
+  const filterWorkDays = (date: Date): boolean => {
+    return isWorkDay(date);
+  };
+
+  const checkGitHubToken = async () => {
     try {
-      // Buscar o token do GitHub do usuário
-      const userSettingsResponse = await fetch('/api/user/settings');
-      if (!userSettingsResponse.ok) {
-        throw new Error('Erro ao buscar configurações do usuário');
+      const response = await fetch('/api/user/settings', {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        setHasGitHubToken(false);
+        return false;
       }
       
-      const userSettings = await userSettingsResponse.json();
-      if (!userSettings.githubToken) {
-        throw new Error('Token do GitHub não configurado');
+      const data = await response.json();
+      const hasToken = !!data.githubToken;
+      setHasGitHubToken(hasToken);
+      return hasToken;
+    } catch (error) {
+      console.error('Erro ao verificar token do GitHub:', error);
+      setHasGitHubToken(false);
+      return false;
+    }
+  };
+
+  const syncCommits = async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/sync-commits`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Falha ao sincronizar commits');
       }
 
-      // Buscar commits de cada repositório
-      const allCommits: GitHubCommit[] = [];
-      
-      for (const repo of repositories) {
-        try {
-          const [owner, repoName] = repo.split('/');
-          const response = await fetch(
-            `https://api.github.com/repos/${owner}/${repoName}/commits?per_page=100`,
-            {
-              headers: {
-                Authorization: `Bearer ${userSettings.githubToken}`,
-                Accept: 'application/vnd.github.v3+json',
-              },
-            }
-          );
+      await fetchCommits();
+      toast.success('Commits sincronizados com sucesso!');
+    } catch (error) {
+      console.error('Erro ao sincronizar commits:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao sincronizar commits';
+      toast.error(errorMessage);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
-          if (!response.ok) {
-            console.error(`Erro ao buscar commits do repositório ${repo}:`, await response.text());
-            continue;
-          }
-
-          const repoCommits = await response.json();
-          allCommits.push(...repoCommits);
-        } catch (error) {
-          console.error(`Erro ao buscar commits do repositório ${repo}:`, error);
+  const fetchCommits = async () => {
+    try {
+      const cacheKey = `commits-${projectId}-${startDate}-${endDate}`;
+      const cachedData = sessionStorage.getItem(cacheKey);
+      if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const now = Date.now();
+        if (now - timestamp < 5 * 60 * 1000) {
+          setCommits(data);
+          return;
         }
       }
 
-      // Ordenar commits por data (mais recentes primeiro)
-      allCommits.sort((a, b) => 
-        new Date(b.commit.author.date).getTime() - new Date(a.commit.author.date).getTime()
-      );
+      const response = await fetch(`/api/projects/${projectId}/commits?startDate=${startDate}&endDate=${endDate}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
 
-      setCommits(allCommits);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Falha ao buscar commits');
+      }
+      
+      const data = await response.json();
+      const commitsByDate: Record<string, Commit[]> = {};
+
+      data.forEach((commit: GitHubCommit) => {
+        try {
+          const commitDate = new Date(commit.commit.author.date);
+          if (isNaN(commitDate.getTime())) {
+            console.warn('Data inválida encontrada:', commit.commit.author.date);
+            return;
+          }
+          
+          const dateKey = format(commitDate, 'yyyy-MM-dd');
+          
+          if (!commitsByDate[dateKey]) {
+            commitsByDate[dateKey] = [];
+          }
+          
+          commitsByDate[dateKey].push({
+            sha: commit.sha,
+            message: commit.commit.message,
+            author: commit.commit.author.name,
+            date: commit.commit.author.date,
+            url: commit.html_url
+          });
+        } catch (error) {
+          console.warn('Erro ao processar commit:', error);
+        }
+      });
+
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        data: commitsByDate,
+        timestamp: Date.now()
+      }));
+
+      setCommits(commitsByDate);
     } catch (error) {
       console.error('Erro ao buscar commits:', error);
-      setError(error instanceof Error ? error.message : 'Erro ao buscar commits');
-    } finally {
-      setIsLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao buscar commits';
+      setError(errorMessage);
+      toast.error('Erro ao buscar commits. Por favor, verifique se o token do GitHub está configurado e se os repositórios estão corretos.');
     }
   };
 
-  useEffect(() => {
-    fetchCommitsFromGitHub();
-    // Atualizar commits a cada 5 minutos
-    const interval = setInterval(fetchCommitsFromGitHub, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [repositories]);
-
-  // Obter o primeiro e último dia do mês atual
-  const today = new Date();
-  const firstDayOfMonth = startOfMonth(today);
-  const lastDayOfMonth = endOfMonth(today);
-
-  // Gerar array com todos os dias do mês
-  const daysOfMonth = eachDayOfInterval({
-    start: firstDayOfMonth,
-    end: lastDayOfMonth,
-  });
-
-  // Mapear os commits por data
-  const commitsByDate = commits.reduce((acc, commit) => {
-    const date = format(new Date(commit.commit.author.date), 'dd/MM/yyyy');
-    if (!acc[date]) {
-      acc[date] = [];
-    }
-    // Filtrar informações sensíveis e comentários
-    const message = commit.commit.message
-      .split('\n')[0] // Pegar apenas a primeira linha (título do commit)
-      .replace(/password|senha|token|key|api[_-]?key|secret|credencial/i, '[INFORMAÇÃO REMOVIDA]')
-      .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL REMOVIDO]')
-      .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, '[CPF REMOVIDO]')
-      .replace(/\b\d{2}\.?\d{4,5}-?\d{4}\b/g, '[TELEFONE REMOVIDO]');
-    
-    acc[date].push(message);
-    return acc;
-  }, {} as Record<string, string[]>);
-
-  // Função para verificar se um dia é um dia de trabalho
-  const isWorkDay = (date: Date) => {
-    const workSchedule = WorkSchedule.find(schedule => 
-      schedule.dayOfWeek === date.getDay() && schedule.isWorkDay
-    );
-    return !!workSchedule;
+  const formatDate = (date: Date): string => {
+    return format(date, 'yyyy-MM-dd');
   };
 
-  // Função para distribuir os commits entre os dias de trabalho
-  const distributeCommits = () => {
-    const workDays = daysOfMonth.filter(isWorkDay);
-    
-    // Filtrar commits apenas do mês atual
-    const currentMonthCommits = Object.entries(commitsByDate)
-      .filter(([date]) => {
-        const [day, month, year] = date.split('/');
-        const commitDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        return commitDate >= firstDayOfMonth && commitDate <= lastDayOfMonth;
-      })
-      .reduce((acc, [date, commits]) => {
-        acc[date] = commits;
-        return acc;
-      }, {} as Record<string, string[]>);
-
-    const allCommits = Object.values(currentMonthCommits).flat();
-    const distributedCommits: Record<string, string[]> = {};
-
-    // Inicializar todos os dias de trabalho com arrays vazios
-    workDays.forEach(date => {
-      const formattedDate = format(date, 'dd/MM/yyyy');
-      distributedCommits[formattedDate] = [];
-    });
-
-    // Distribuir os commits entre os dias de trabalho
-    if (workDays.length > 0 && allCommits.length > 0) {
-      let currentDayIndex = 0;
-      allCommits.forEach((commit) => {
-        const date = workDays[currentDayIndex];
-        const formattedDate = format(date, 'dd/MM/yyyy');
-        distributedCommits[formattedDate].push(commit);
-        currentDayIndex = (currentDayIndex + 1) % workDays.length;
-      });
-    }
-
-    return distributedCommits;
-  };
-
-  // Função para formatar os commits com quebra de linha
-  const formatCommits = (commits: string[]) => {
-    return commits.join('\n');
-  };
-
-  // Gerar a planilha
-  const spreadsheet = daysOfMonth
-    .filter(date => isWorkDay(date))
-    .map(date => {
-      const formattedDate = format(date, 'dd/MM/yyyy');
-      const dayOfWeek = format(date, 'EEEE', { locale: ptBR });
-      const workSchedule = WorkSchedule.find(schedule => 
-        schedule.dayOfWeek === date.getDay() && schedule.isWorkDay
-      );
-      
-      let commitsForDay: string[] = [];
-      
-      if (spreadCommits) {
-        commitsForDay = distributeCommits()[formattedDate] || [];
-      } else {
-        commitsForDay = commitsByDate[formattedDate] || [];
-      }
-
-      return {
-        dayOfWeek,
-        date: formattedDate,
-        startTime: workSchedule?.startTime || '07:00',
-        endTime: workSchedule?.endTime || '17:00',
-        description: formatCommits(commitsForDay) || 'Sem commits',
-      };
-    });
-
-  // Função para melhorar todas as mensagens de commit
-  const improveAllCommitMessages = async () => {
-    if (!improveCommitMessages) return;
-    
-    setIsImprovingMessages(true);
-    setError(null);
-    
+  const fetchDailyActivities = async () => {
     try {
-      const improvedCommits = [...commits];
-      const totalCommits = improvedCommits.length;
-      let processedCount = 0;
-      let successCount = 0;
-      let errorCount = 0;
-      
-      // Inicializar o progresso
-      setProgress({ current: 0, total: totalCommits });
-      
-      // Processar commits em lotes para melhorar a experiência do usuário
-      const batchSize = 3; // Reduzido para evitar problemas de rate limiting
-      for (let i = 0; i < improvedCommits.length; i += batchSize) {
-        const batch = improvedCommits.slice(i, i + batchSize);
-        
-        // Processar cada commit no lote atual
-        await Promise.all(batch.map(async (commit, index) => {
-          try {
-            const originalMessage = commit.commit.message;
-            
-            // Verificar se a mensagem já contém a instrução (para evitar duplicação)
-            if (originalMessage.includes("Melhore a seguinte mensagem de commit")) {
-              // Se já contiver a instrução, usar a mensagem original
-              console.warn("Mensagem já contém instrução, usando mensagem original");
-              successCount++;
-            } else {
-              const improvedMessage = await improveCommitMessage(originalMessage);
-              
-              // Verificar se a mensagem melhorada é diferente da original
-              if (improvedMessage !== originalMessage) {
-                improvedCommits[i + index] = {
-                  ...commit,
-                  commit: {
-                    ...commit.commit,
-                    message: improvedMessage
-                  }
-                };
-                successCount++;
-              } else {
-                console.warn("Mensagem não foi melhorada, mantendo original");
-              }
-            }
-          } catch (err) {
-            console.error(`Erro ao melhorar mensagem ${i + index}:`, err);
-            errorCount++;
-          }
-          
-          processedCount++;
-          // Atualizar o progresso
-          setProgress({ current: processedCount, total: totalCommits });
-        }));
-        
-        // Atualizar o estado a cada lote para mostrar o progresso
-        setCommits([...improvedCommits]);
-        
-        // Adicionar um pequeno atraso entre os lotes para evitar problemas de rate limiting
-        if (i + batchSize < improvedCommits.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+      const cacheKey = `activities-${projectId}`;
+      const cachedData = sessionStorage.getItem(cacheKey);
+      if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const now = Date.now();
+        if (now - timestamp < 5 * 60 * 1000) {
+          setDailyActivities(data);
+          return;
         }
       }
-      
-      // Mostrar mensagem de resumo
-      if (errorCount > 0) {
-        setError(`Melhoramos ${successCount} de ${totalCommits} mensagens. ${errorCount} mensagens não puderam ser melhoradas.`);
-      } else if (successCount > 0) {
-        toast.success(`Melhoramos ${successCount} de ${totalCommits} mensagens com sucesso!`);
+
+      const response = await fetch(`/api/projects/${projectId}/daily-activities`);
+      if (!response.ok) {
+        throw new Error('Erro ao buscar atividades');
       }
+      const data: PrismaDailyActivity[] = await response.json();
+      const formattedActivities: DailyActivityState[] = data.map((activity) => ({
+        id: activity.id,
+        description: activity.description,
+        date: format(new Date(activity.date), 'yyyy-MM-dd'),
+        status: activity.status as Status
+      }));
+
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        data: formattedActivities,
+        timestamp: Date.now()
+      }));
+
+      setDailyActivities(formattedActivities);
     } catch (error) {
-      console.error('Erro ao melhorar mensagens:', error);
-      setError('Erro ao melhorar mensagens de commit. Verifique o console para mais detalhes.');
-    } finally {
-      setIsImprovingMessages(false);
-      setProgress({ current: 0, total: 0 });
+      console.error('Error fetching activities:', error);
+      toast.error('Erro ao carregar atividades');
     }
   };
 
-  // Efeito para melhorar mensagens quando a flag for ativada
   useEffect(() => {
-    if (improveCommitMessages && commits.length > 0) {
-      improveAllCommitMessages();
+    if (projectId) {
+      const loadData = async () => {
+        setIsLoading(true);
+        try {
+          const hasToken = await checkGitHubToken();
+          
+          const promises = [fetchDailyActivities()];
+          if (hasToken) {
+            promises.push(fetchCommits());
+          }
+          
+          await Promise.all(promises);
+        } catch (error) {
+          console.error('Erro ao carregar dados:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      loadData();
     }
-  }, [improveCommitMessages]);
+  }, [projectId, selectedMonth]);
+
+  useEffect(() => {
+    if (projectId && hasGitHubToken) {
+      const interval = setInterval(syncCommits, 15 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [projectId, hasGitHubToken]);
+
+  const handleStatusChange = async (activityId: string, newStatus: Status) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/daily-activities/${activityId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar status');
+      }
+
+      setDailyActivities(prevActivities => 
+        prevActivities.map(activity => 
+          activity.id === activityId 
+            ? { ...activity, status: newStatus } 
+            : activity
+        )
+      );
+
+      if (newStatus === 'concluido') {
+        const currentActivity = dailyActivities.find(a => a.id === activityId);
+        if (currentActivity) {
+          const currentDate = new Date(currentActivity.date);
+          
+          const previousActivities = dailyActivities.filter(activity => {
+            const activityDate = new Date(activity.date);
+            return activityDate < currentDate && activity.status !== 'concluido';
+          });
+
+          if (previousActivities.length > 0) {
+            if (confirm(`Existem ${previousActivities.length} atividades anteriores não concluídas. Deseja marcá-las como concluídas também?`)) {
+              for (const activity of previousActivities) {
+                await fetch(`/api/projects/${projectId}/daily-activities/${activity.id}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ status: 'concluido' }),
+                });
+              }
+
+              setDailyActivities(prevActivities =>
+                prevActivities.map(activity =>
+                  previousActivities.some(pa => pa.id === activity.id)
+                    ? { ...activity, status: 'concluido' }
+                    : activity
+                )
+              );
+
+              toast.success(`${previousActivities.length} atividades anteriores foram marcadas como concluídas`);
+            }
+          }
+        }
+      }
+
+      toast.success('Status atualizado com sucesso');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Erro ao atualizar status');
+    }
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/daily-activities/${activityId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao excluir atividade');
+      }
+
+      // Atualiza o estado local removendo a atividade excluída
+      setDailyActivities(prevActivities => 
+        prevActivities.filter(activity => activity.id !== activityId)
+      );
+
+      toast.success('Atividade excluída com sucesso');
+    } catch (error) {
+      console.error('Erro ao excluir atividade:', error);
+      toast.error('Erro ao excluir atividade');
+    }
+  };
+
+  const handleExport = () => {
+    try {
+      // Prepara os dados para exportação
+      const rows = [
+        ['Dia da Semana', 'Data', 'Início', 'Fim', 'Descrição']
+      ];
+
+      // Cria um array com todos os dias do mês
+      const firstDay = startOfMonth(selectedMonth);
+      const lastDay = endOfMonth(selectedMonth);
+      const allDays: Date[] = [];
+      let currentDay = firstDay;
+
+      // Coleta todos os dias do mês e identifica os dias úteis
+      const workDays: Date[] = [];
+      while (currentDay <= lastDay) {
+        // Verifica se o dia tem horário de trabalho cadastrado
+        const schedule = workSchedule.find(s => s.dayOfWeek === currentDay.getDay());
+        if (schedule?.isWorkDay && schedule.startTime && schedule.endTime) {
+          allDays.push(currentDay);
+          if (isWorkDay(currentDay)) {
+            workDays.push(currentDay);
+          }
+        }
+        currentDay = addDays(currentDay, 1);
+      }
+
+      // Agrupa todas as entradas por data
+      const entriesByDate: { [date: string]: Array<{ description: string; status: string; type: string }> } = {};
+
+      // Adiciona atividades ao agrupamento
+      dailyActivities.forEach(activity => {
+        const date = format(parseISO(activity.date), 'yyyy-MM-dd');
+        if (!entriesByDate[date]) {
+          entriesByDate[date] = [];
+        }
+        entriesByDate[date].push({
+          description: activity.description,
+          status: activity.status,
+          type: 'Atividade'
+        });
+      });
+
+      // Adiciona commits ao agrupamento
+      if (shouldSpreadCommits && workDays.length > 0) {
+        // Coleta todos os commits do mês
+        const allCommits = Object.entries(commits).flatMap(([_, dateCommits]) => dateCommits);
+        
+        // Distribui os commits entre os dias úteis
+        allCommits.forEach((commit, index) => {
+          const workDayIndex = index % workDays.length;
+          const workDay = workDays[workDayIndex];
+          const dateStr = format(workDay, 'yyyy-MM-dd');
+          
+          if (!entriesByDate[dateStr]) {
+            entriesByDate[dateStr] = [];
+          }
+          
+          entriesByDate[dateStr].push({
+            description: commit.message,
+            status: 'commit',
+            type: 'Commit'
+          });
+        });
+      } else {
+        // Mantém os commits em suas datas originais
+        Object.entries(commits).forEach(([date, dateCommits]) => {
+          if (!entriesByDate[date]) {
+            entriesByDate[date] = [];
+          }
+          dateCommits.forEach(commit => {
+            entriesByDate[date].push({
+              description: commit.message,
+              status: 'commit',
+              type: 'Commit'
+            });
+          });
+        });
+      }
+
+      // Adiciona uma linha para cada dia do mês que tem horário de trabalho
+      allDays.forEach(date => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const diaDaSemana = format(date, 'EEEE', { locale: ptBR });
+        const dataFormatada = format(date, 'dd/MM/yyyy');
+        
+        // Encontra o horário de trabalho para este dia da semana
+        const schedule = workSchedule.find(s => s.dayOfWeek === date.getDay());
+        
+        // Só adiciona a linha se houver horário de trabalho cadastrado
+        if (schedule?.isWorkDay && schedule.startTime && schedule.endTime) {
+          // Pega as descrições do dia, se houver
+          const entries = entriesByDate[dateStr] || [];
+          const descricoes = entries.length > 0 
+            ? entries.map(entry => {
+                if (entry.type === 'Atividade') {
+                  return `${entry.description} (${entry.status})`;
+                }
+                return `Commit: ${entry.description}`;
+              }).join(' | ')
+            : '-';
+          
+          rows.push([
+            diaDaSemana,
+            dataFormatada,
+            schedule.startTime,
+            schedule.endTime,
+            descricoes
+          ]);
+        }
+      });
+
+      // Cria o conteúdo CSV
+      const csvContent = rows
+        .map(row => row.map(cell => `"${cell}"`).join(';'))
+        .join('\r\n');
+
+      // Adiciona BOM para suporte a caracteres especiais
+      const csvWithBOM = '\uFEFF' + csvContent;
+
+      // Cria o blob e o link para download
+      const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      
+      // Cria o elemento de link
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio-${projectName}-${format(new Date(), 'dd-MM-yyyy')}.csv`;
+      
+      // Adiciona o link ao documento, clica nele e depois remove
+      document.body.appendChild(link);
+      link.click();
+      
+      // Limpa o URL e remove o link
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+
+      toast.success('Relatório exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar relatório:', error);
+      toast.error('Erro ao exportar relatório');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 p-4 rounded-lg">
+        <p className="text-red-800">{error}</p>
+        {error.includes('Token do GitHub não configurado') && (
+          <div className="mt-4">
+            <a 
+              href="/settings" 
+              className="text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Configurar token do GitHub →
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={spreadCommits}
-              onChange={(e) => setSpreadCommits(e.target.checked)}
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700">Distribuir commits entre os dias de trabalho</span>
-          </label>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <h2 className="text-xl font-semibold text-gray-800">Atividades do Projeto</h2>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePreviousMonth}
+            className="p-2 rounded-full hover:bg-gray-100"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
           
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={improveCommitMessages}
-              onChange={(e) => setImproveCommitMessages(e.target.checked)}
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              disabled={isImprovingMessages}
-            />
-            <span className="text-sm text-gray-700">
-              {isImprovingMessages ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Melhorando mensagens...
-                </span>
-              ) : (
-                'Melhorar mensagens de commit'
-              )}
-            </span>
-          </label>
+          <span className="text-sm font-medium min-w-[140px] text-center">
+            {format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
+          </span>
           
           <button
-            onClick={fetchCommitsFromGitHub}
-            disabled={isLoading}
+            onClick={handleNextMonth}
+            className="p-2 rounded-full hover:bg-gray-100"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="flex items-center gap-2 mr-4">
+            <input
+              type="checkbox"
+              id="spreadCommits"
+              checked={shouldSpreadCommits}
+              onChange={(e) => setShouldSpreadCommits(e.target.checked)}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="spreadCommits" className="text-sm text-gray-700">
+              Distribuir commits
+            </label>
+          </div>
+
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-full shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <svg className="-ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Exportar Dados
+          </button>
+
+          <button
+            onClick={syncCommits}
+            disabled={isSyncing}
             className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
           >
-            {isLoading ? (
+            {isSyncing ? (
               <>
                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Carregando...
+                Sincronizando...
               </>
             ) : (
               <>
                 <svg className="-ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Atualizar
+                Sincronizar Commits
               </>
             )}
           </button>
         </div>
-        <ExportButton 
-          data={spreadsheet} 
-          filename={`relatorio-${projectName}-${format(firstDayOfMonth, 'yyyy-MM')}.xlsx`} 
-        />
       </div>
 
-      {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Erro</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ActivityKanban 
+        activities={dailyActivities}
+        onStatusChange={handleStatusChange}
+        onDeleteActivity={handleDeleteActivity}
+        selectedMonth={selectedMonth}
+        projectId={projectId}
+        onActivityAdded={fetchDailyActivities}
+      />
 
-      {isImprovingMessages && (
-        <div className="rounded-md bg-blue-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <h3 className="text-sm font-medium text-blue-800">Processando mensagens</h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>Estamos melhorando as mensagens de commit usando IA. Isso pode levar alguns segundos...</p>
-                
-                {progress.total > 0 && (
-                  <div className="mt-2">
-                    <div className="flex justify-between text-xs text-blue-600 mb-1">
-                      <span>Progresso: {progress.current} de {progress.total} mensagens</span>
-                      <span>{Math.round((progress.current / progress.total) * 100)}%</span>
-                    </div>
-                    <div className="w-full bg-blue-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
-                        style={{ width: `${(progress.current / progress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-        {isLoading ? (
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
-            <div className="flex justify-center">
-              <svg className="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <p className="mt-2 text-gray-500">Carregando commits do GitHub...</p>
-          </div>
-        ) : spreadsheet.length === 0 ? (
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
-            <p className="text-gray-500">Nenhum dia de trabalho encontrado para este mês.</p>
-            <p className="text-sm text-gray-400 mt-2">Configure os horários de trabalho para os dias da semana.</p>
-          </div>
-        ) : (
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dia da Semana
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Início
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fim
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Descrição
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {spreadsheet.map((row, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {row.dayOfWeek}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {row.date}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {row.startTime}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {row.endTime}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {row.description}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <ActivityTable 
+        commits={commits}
+        activities={dailyActivities}
+        isWorkDay={isWorkDay}
+        selectedMonth={selectedMonth}
+      />
     </div>
   );
 } 

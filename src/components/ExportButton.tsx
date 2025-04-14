@@ -1,82 +1,81 @@
 'use client';
 
-import { DownloadIcon } from 'lucide-react';
-import Button from '@/components/ui/button';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface ExportButtonProps {
-  data: any[];
+  data: Array<{
+    dayOfWeek: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    description: React.ReactNode;
+    descriptionForExport: string;
+  }>;
   filename: string;
 }
 
 export default function ExportButton({ data, filename }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = async () => {
+  const handleExport = () => {
+    setIsExporting(true);
     try {
-      setIsExporting(true);
-      
-      // Converte os dados para o formato esperado pelo Excel
-      const excelData = data.map(row => ({
-        'Dia da Semana': row.dayOfWeek,
-        'Data': row.date,
-        'Início': row.startTime,
-        'Fim': row.endTime,
-        'Descrição': row.description
+      // Preparar dados para exportação
+      const exportData = data.map(item => ({
+        'Dia da Semana': item.dayOfWeek,
+        'Data': item.date,
+        'Início': item.startTime,
+        'Fim': item.endTime,
+        'Descrição': item.descriptionForExport,
       }));
 
-      // Faz a requisição para a API
-      const response = await fetch('/api/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: excelData,
-          filename: `${filename}.xlsx`
-        }),
-      });
+      // Criar planilha
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Relatório');
 
-      if (!response.ok) {
-        throw new Error('Erro ao exportar dados');
-      }
+      // Ajustar largura das colunas
+      const colWidths = [
+        { wch: 15 }, // Dia da Semana
+        { wch: 12 }, // Data
+        { wch: 8 },  // Início
+        { wch: 8 },  // Fim
+        { wch: 50 }, // Descrição
+      ];
+      ws['!cols'] = colWidths;
 
-      // Obtém o blob da resposta
-      const blob = await response.blob();
-      
-      // Cria um URL para o blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Cria um link temporário para download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${filename}.xlsx`;
-      
-      // Adiciona o link ao documento, clica nele e remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Limpa o URL do blob
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('Arquivo exportado com sucesso!');
+      // Exportar arquivo
+      XLSX.writeFile(wb, filename);
     } catch (error) {
       console.error('Erro ao exportar:', error);
-      toast.error('Erro ao exportar arquivo');
     } finally {
       setIsExporting(false);
     }
   };
 
   return (
-    <Button
-      variant="secondary"
+    <button
       onClick={handleExport}
-      leftIcon={<DownloadIcon className="h-4 w-4" />}
+      disabled={isExporting}
+      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
     >
-      Exportar para Excel
-    </Button>
+      {isExporting ? (
+        <>
+          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Exportando...
+        </>
+      ) : (
+        <>
+          <svg className="-ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Exportar
+        </>
+      )}
+    </button>
   );
 } 
