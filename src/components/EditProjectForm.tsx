@@ -125,7 +125,7 @@ export default function EditProjectForm({ project }: EditProjectFormProps) {
                     onSelect={setSelectedRepos}
                     selectedRepos={selectedRepos.map(repo => repo.full_name)}
                     multiple={true}
-                    organization={project.organization}
+                    organization={project.organization ?? undefined}
                   />
                 </div>
               </div>
